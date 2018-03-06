@@ -1,0 +1,32 @@
+<style type="text/css">
+*{ padding: 0; margin: 0;} 
+body{ padding-left: 1rem; }
+a{color:#2E5CD5;cursor: pointer;text-decoration: none} 
+a:hover{text-decoration:underline; } 
+body{ background: #C7EDCC; font-family: "Century Gothic","Microsoft yahei"; color: #333;font-size:18px} 
+h1{ font-size: 94px; font-weight: normal;  display: block;float: left;letter-spacing:-6px;} 
+h1 b{ font-weight:500; font-size: 59px;  display: block;float: right;  margin-top: 70px;}
+.trace p{font-size: 0.5rem;}
+</style>
+<div style="width: 1000px; margin: 0 auto;"> 
+	<div style="background: #70DB93; width: 150px; height: 150px; float: left; margin-right: 5px; margin-top: 20px;"></div>
+	<div style="width: 235px; height: 150px; float: left;margin-top:20px; "><h1>Den<b>ha</b></h1></div>
+	<div style="width: 300px; float: left;border-left: 1px solid #ccc; margin-top: 100px; padding-left: 5px;">
+		<p style="line-height: 1.6em; font-size: 42px">ERROR!</p>
+	</div>
+	<div style="clear: both;height: 0px;"></div>
+	<div style="font-size: 1rem; line-height: 2rem;font-weight: bolder;">
+		<?php if($e['type']){ ?>
+		<b><?php echo self::$traceErrorType[$e['type']]; ?> </b> 
+		<?php } ?>
+		<?php echo $e['message']; ?> 
+		<?php if($e['file']){ ?> 
+		from 
+		<font style="color: red;"><?php echo $e['file']; ?> in <?php echo $e['line']; ?></font>
+		<?php } ?>
+		<?php if(isset($e['trace'])){ ?> 
+		<div class="trace"><p><?php echo str_replace(PHP_EOL,'</p><hr/><p >',$e['trace']); ?></p></div>
+		<?php } ?>
+	</div>
+</div>
+<?php die;?>
