@@ -20,7 +20,9 @@
     "require-dev": {
     },
     "autoload": {
-        "files": [],
+        "files": [  
+            "framework/Function.php"
+        ],
         "psr-4": {
             "denha\\": "framework"
         }
