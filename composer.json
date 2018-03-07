@@ -21,10 +21,10 @@
     },
     "autoload": {
         "files": [  
-            "framework/Function.php"
+            "src/Function.php"
         ],
         "psr-4": {
-            "denha\\": "framework"
+            "denha\\": "framework/src"
         }
     }
 }
