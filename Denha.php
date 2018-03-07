@@ -8,10 +8,10 @@ date_default_timezone_set('PRC');
 define('MEMORY_LIMIT_ON', function_exists('memory_get_usage')); //判断是否存在内存消耗函数
 define('DS', DIRECTORY_SEPARATOR);
 
-define('ROOT_PATH', dirname(__DIR__) . DS); //根目录
+define('ROOT_PATH', dirname(dirname(dirname(__DIR__))) . DS); //根目录
 define('APP_PATH', ROOT_PATH . 'appliaction' . DS); //程序根目录
 define('FARM_PATH', ROOT_PATH . 'denha' . DS . 'framework' . DS); //框架根目录
-define('CONFIG_PATH', ROOT_PATH . 'conf' . DS); //配置文档地址
+define('CONFIG_PATH', ROOT_PATH . 'config' . DS); //配置文档地址
 define('DATA_PATH', ROOT_PATH . 'data' . DS); //缓存地址
 define('PUBLIC_PATH', ROOT_PATH . 'public' . DS); //公共地址目录
 define('EXT', '.php'); //文件后缀
