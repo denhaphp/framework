@@ -24,7 +24,7 @@
             "src/Function.php"
         ],
         "psr-4": {
-            "denha\\": "framework/src"
+            "denha\\": "src"
         }
     }
 }
