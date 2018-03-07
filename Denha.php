@@ -1,5 +1,7 @@
 <?php
-$GLOBALS['_beginTime'] = microtime(true); //程序开始时间
+
+//程序开始时间
+define('BEGIN_TIME', microtime(true));
 
 date_default_timezone_set('PRC');
 
@@ -39,8 +41,3 @@ if (!IS_CLI) {
     define('IS_DELETE', REQUEST_METHOD == 'DELETE' ? true : false);
     define('IS_AJAX', (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && (strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest')) || !empty($_POST['ajax']) || !empty($_GET['ajax']) ? true : false);
 }
-
-require FARM_PATH . 'AutoLoad.php';
-require FARM_PATH . 'Function.php';
-
-denha\AutoLoad::register();
