@@ -1,18 +1,17 @@
 <?php
-
-//程序开始时间
-define('BEGIN_TIME', microtime(true));
+$GLOBALS['_beginTime'] = microtime(true); //程序开始时间
 
 date_default_timezone_set('PRC');
 
 define('MEMORY_LIMIT_ON', function_exists('memory_get_usage')); //判断是否存在内存消耗函数
 define('DS', DIRECTORY_SEPARATOR);
 
-define('ROOT_PATH', dirname(dirname(dirname(__DIR__))) . DS); //根目录
+define('ROOT_PATH', dirname(__DIR__) . DS); //根目录
 define('APP_PATH', ROOT_PATH . 'appliaction' . DS); //程序根目录
 define('FARM_PATH', ROOT_PATH . 'denha' . DS . 'framework' . DS); //框架根目录
-define('CONFIG_PATH', ROOT_PATH . 'config' . DS); //配置文档地址
-define('DATA_PATH', ROOT_PATH . 'data' . DS); //缓存地址
+define('CONFIG_PATH', ROOT_PATH . 'conf' . DS); //配置文档目录
+define('DATA_PATH', ROOT_PATH . 'data' . DS); //缓存目录
+define('VIEW_PATH', ROOT_PATH . 'resources' . DS); //资源目录
 define('PUBLIC_PATH', ROOT_PATH . 'public' . DS); //公共地址目录
 define('EXT', '.php'); //文件后缀
 
@@ -41,3 +40,8 @@ if (!IS_CLI) {
     define('IS_DELETE', REQUEST_METHOD == 'DELETE' ? true : false);
     define('IS_AJAX', (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && (strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest')) || !empty($_POST['ajax']) || !empty($_GET['ajax']) ? true : false);
 }
+
+require FARM_PATH . 'AutoLoad.php';
+require FARM_PATH . 'Function.php';
+
+denha\AutoLoad::register();

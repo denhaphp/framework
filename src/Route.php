@@ -5,38 +5,47 @@ class Route
 {
     public static $path;
     public static $class;
-    private $uri;
-    private $rule;
-
-    //后台快捷路由
-    public static function admin()
-    {
-        $uri   = self::parseUri();
-        $array = explode('/', $uri);
-    }
+    public static $uri;
+    public static $rule;
 
     //执行主体
     public static function main($route = 'mca')
     {
-        $uri   = self::parseUri();
-        $array = explode('/s/', $uri);
-        //转换路由
-        $pathArray = array_values(array_filter(explode('/', $array[0])));
+        self::$uri = self::parseUri();
 
-        $config = getConfig('route.' . APP);
+        if (!config('open_uri_level')) {
+            $uriArr = explode('/s/', self::$uri);
+            //转换路由
+            $routeArr = array_values(array_filter(explode('/', reset($uriArr))));
 
-        //如果存在路由配置文件 按路由配置文件处理
-        if (isset($config) && isset($config[$pathArray[0]])) {
+            define('MODULE', implode(DS, array_slice($routeArr, 0, -2)));
+            define('CONTROLLER', parsename(implode(array_slice($routeArr, -2, 1)), true));
+            define('ACTION', end($routeArr));
 
-            $base = &$config[$pathArray[0]];
-            self::$path .= APP . '\\' . $base['path'];
-            $route = isset($base['rule']) ? $base['rule'] : 'mca';
-            self::$route();
+            $class = array('app', implode('\\', array_slice($routeArr, 0, -2)), CONTROLLER);
+
+            self::changeGetValue($uriArr[1]);
+        } else {
+            $baseUriArr = explode('/', self::$uri);
+            $routeArr   = array_slice($baseUriArr, 0, config('base_uri_level'));
+            define('MODULE', implode('/', array_slice($routeArr, 0, -2)));
+            define('CONTROLLER', parsename(implode(array_slice($routeArr, -2, 1)), true));
+            define('ACTION', end($routeArr));
+
+            if (strpos(self::$uri, '/s/') === false) {
+                $uriArr[] = MODULE . '/' . CONTROLLER . '/' . ACTION;
+                $uriArr[] = str_replace(MODULE, '', self::$uri);
+            } else {
+                $uriArr = explode('/s/', self::$uri);
+            }
+
+            $class = array('app', implode('\\', array_slice($routeArr, 0, -2)), CONTROLLER);
+
+            self::changeGetValue($uriArr);
+
         }
-        //如果不存在配置文件
-        else {
-            self::$route();
-        }
+
+        return self::$class = implode('\\', $class);
 
     }
 
@@ -268,11 +277,11 @@ class Route
      * @param  [type]                   $array [description]
      * @return [type]                          [description]
      */
-    private static function changeGetValue($array)
+    private static function changeGetValue($uri)
     {
         //转换参数
-        if (isset($array[1])) {
-            $paramArray = array_values(explode('/', $array[1]));
+        if (isset($uri[1])) {
+            $paramArray = array_values(explode('/', $uri[1]));
 
             $total = count($paramArray);
 

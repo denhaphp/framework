@@ -7,11 +7,13 @@ class Mysqli
 {
 
     private static $instance;
+    public static $options; //记录参数信息
 
     public static $link; //mysql链接信息
 
     public $dbConfig; //数据库连接信息
     public $tablepre; //表前缀
+    public $build; //保存未解析Sql信息
     public $sqlInfo; //执行sql记录
 
     public $linkId;
@@ -37,24 +39,23 @@ class Mysqli
         if ($dbConfig) {
             $this->dbConfig = $dbConfig;
         } else {
-            if (getConfig('db.' . APP_CONFIG)) {
-                $this->dbConfig = getConfig('db.' . APP_CONFIG);
-            } else {
-                $this->dbConfig = getConfig('db');
+            $this->dbConfig = config();
+        }
+
+        $dbConfig = $this->dbConfig['db_config'];
+
+        foreach ($dbConfig as $key => $value) {
+            if ($value['db_host'] == '' || $value['db_user'] == '' || $value['db_name'] == '') {
+                throw new Exception('接数据库信息有误！请查看是否配置正确与完整');
             }
+
+            $res[$key] = $this->openMysql($value);
+
+            Mysqli::$options['dbConfig'][$key] = $value;
+
         }
 
-        $this->tablepre = $this->dbConfig['db_prefix'];
-
-        if ($this->dbConfig['db_host'] == '' || $this->dbConfig['db_user'] == '' || $this->dbConfig['db_name'] == '') {
-            throw new Exception('接数据库信息有误！请查看是否配置正确');
-        }
-
-        Mysqli::$link = $this->openMysql();
-        mysqli_query(Mysqli::$link, 'set names utf8mb4');
-        mysqli_query(Mysqli::$link, 'SET sql_mode =\'ANSI,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION\'');
-
-        $this->linkId = Mysqli::$link;
+        Mysqli::$link = $res;
 
     }
 
@@ -74,19 +75,20 @@ class Mysqli
      * @date   2017-03-19T16:18:28+0800
      * @author ChenMingjiang
      */
-    public function openMysql()
+    public function openMysql($dbConfig = array())
     {
         try {
-            $res = mysqli_connect($this->dbConfig['db_host'], $this->dbConfig['db_user'], $this->dbConfig['db_pwd'], $this->dbConfig['db_name']);
+            $res = mysqli_connect($dbConfig['db_host'], $dbConfig['db_user'], $dbConfig['db_pwd'], $dbConfig['db_name']);
+
+            mysqli_query($res, 'set names utf8mb4');
+            mysqli_query($res, 'SET sql_mode =\'STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION\'');
+
         } catch (Exception $e) {
             throw new Exception($e->getMessage());
         }
 
         if (!$res) {
-            if (!$this->linkId) {
-                throw new Exception('连接数据库失败，可能数据库密码不对或数据库服务器出错！');
-            }
-
+            throw new Exception('连接数据库失败，可能数据库密码不对或数据库服务器出错！');
         }
 
         return $res;
@@ -97,20 +99,27 @@ class Mysqli
         return $this->_sql;
     }
 
-    /**
-     * 数据表
-     * @date   2017-03-19T16:18:23+0800
-     * @author ChenMingjiang
-     * @param  [type]                   $table  [description]
-     * @param  string                   $table2 [description]
-     * @return [type]                           [description]
-     */
-    public function table($table, $isTablepre = true)
+    /** 链接 */
+    public function connect($id = '')
     {
-        $this->table = parseName($table);
-        if ($isTablepre) {
-            $this->tablepre != '' ? $this->table = $this->tablepre . $this->table : '';
+
+        $this->linkId   = !$id ? reset(Mysqli::$link) : Mysqli::$link[$id];
+        $dbConfig       = !$id ? reset(Mysqli::$options['dbConfig']) : Mysqli::$options['dbConfig'][$id];
+        $this->tablepre = $dbConfig['db_prefix'];
+
+        if (!$this->linkId) {
+            throw new Exception('链接信息异常');
         }
+
+        $this->build['database'] = $dbConfig['db_name'];
+        $this->build['content']  = !$id ? key(Mysqli::$link) : $id;
+
+        return $this;
+    }
+
+    /** 构造Sql初始化 */
+    public function init()
+    {
 
         $this->where     = '';
         $this->field     = '*';
@@ -120,6 +129,35 @@ class Mysqli
         $this->join      = '';
         $this->chilidSql = false;
         $this->having    = '';
+        $this->connect();
+    }
+
+    /**
+     * 数据表
+     * @date   2017-03-19T16:18:23+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $table  [description]
+     * @param  string                   $table2 [description]
+     * @return [type]                           [description]
+     */
+    public function table($table, $options = array())
+    {
+
+        $isTablepre = isset($options['is_tablepre']) ? $options['is_tablepre'] : true;
+        $link       = isset($options['link']) ? $options['link'] : '';
+
+        $this->init();
+
+        if ($link) {
+            $this->connect($link);
+        }
+
+        $this->table = parseName($table);
+        if ($isTablepre) {
+            $this->table = $this->tablepre != '' ? $this->table = $this->tablepre . $this->table : '';
+        }
+
+        $this->build['table'] = array('table' => $this->table, 'is_tablepre' => $isTablepre);
 
         return $this;
     }
@@ -132,6 +170,18 @@ class Mysqli
      * @return [type]                          [description]
      */
     public function tableName()
+    {
+        return $this->table;
+    }
+
+    /**
+     * 获取表名称
+     * @date   2017-06-10T22:56:01+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $table [description]
+     * @return [type]                          [description]
+     */
+    public function getTableName()
     {
         return $this->table;
     }
@@ -222,6 +272,8 @@ class Mysqli
             $this->where .= ' AND ' . substr($newWhere, 0, -4);
         }
 
+        $this->build['where'] = $where;
+
         return $this;
     }
 
@@ -243,6 +295,9 @@ class Mysqli
         $where ?: $where = $this->table . '.id =' . $table . '.id';
 
         $this->join .= ' ' . $float . ' JOIN ' . $table . ' ON ' . $where;
+
+        $this->build['join'] = array('table' => $table, 'where' => $where, 'float' => $float);
+
         return $this;
     }
 
@@ -253,12 +308,14 @@ class Mysqli
      * @param  [type]                   $limit [description]
      * @return [type]                          [description]
      */
-    public function limit($limit, $pageSize = '')
+    public function limit($limit = 0, $pageSize = '')
     {
         $this->limit = ' LIMIT ' . $limit;
         if ($pageSize) {
             $this->limit = ' LIMIT ' . $limit . ',' . $pageSize;
         }
+
+        $this->build['limit'] = array('limit' => $limit, 'pageSize' => $pageSize);
 
         return $this;
     }
@@ -292,6 +349,8 @@ class Mysqli
 
         $this->field = $newField;
 
+        $this->build['field'] = $field;
+
         return $this;
     }
 
@@ -312,6 +371,9 @@ class Mysqli
             $newGroup = $value;
         }
         $this->group = ' GROUP BY ' . $newGroup;
+
+        $this->build['group'] = $group;
+
         return $this;
     }
 
@@ -336,12 +398,9 @@ class Mysqli
             $this->order = ' ORDER BY ' . $newValue;
         }
 
+        $this->build['order'] = $this->order;
+
         return $this;
-    }
-
-    protected function parseField()
-    {
-
     }
 
     /**
@@ -494,6 +553,54 @@ class Mysqli
     {
         $this->having = ' HAVING ' . $field;
         return $this;
+    }
+
+    /**
+     * 获取单个字段内容
+     * @date   2018-04-06T21:35:17+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $field [description]
+     * @return [type]                          [description]
+     */
+    public function value($field)
+    {
+        if (!$this->table) {
+            throw new Exception('请选择数据表');
+        }
+
+        $this->limit(1);
+
+        $this->field($field);
+
+        $this->_sql = 'SELECT ' . $this->field . ' FROM ' . $this->table;
+
+        empty($this->join) ?: $this->_sql .= $this->join;
+        empty($this->where) ?: $this->_sql .= $this->where;
+        empty($this->group) ?: $this->_sql .= $this->group;
+        empty($this->having) ?: $this->_sql .= $this->having;
+        empty($this->order) ?: $this->_sql .= $this->order;
+        empty($this->limit) ?: $this->_sql .= $this->limit;
+
+        $result = $this->query();
+        if (!$result) {
+            throw new Exception('查询sql错误:' . $this->_sql);
+        }
+
+        //获取记录条数
+        $this->total = mysqli_num_rows($result);
+        if ($this->total == 0) {return false;}
+
+        while ($row = mysqli_fetch_array($result, MYSQLI_NUM)) {
+            $this->field = str_replace('`', '', $this->field);
+
+            $data = $row[0];
+        }
+
+        if (empty($data)) {
+            return false;
+        }
+
+        return $data;
     }
 
     /**
@@ -756,7 +863,7 @@ class Mysqli
     {
         //如果没有写入权限尝试修改权限 如果修改后还是失败 则跳过
         if (isWritable(DATA_PATH)) {
-            $path = DATA_PATH . 'sql_log' . DS . $this->dbConfig['db_name'] . DS;
+            $path = DATA_PATH . 'sql_log' . DS . $this->build['database'] . DS;
             is_dir($path) ? '' : mkdir($path, 0755, true);
             $path .= 'error_' . date('Y_m_d_H', TIME) . '.text';
 
@@ -793,7 +900,7 @@ class Mysqli
 
         //记录sql
         if ($this->sqlInfo && $this->dbConfig['db_save_log']) {
-            $path = DATA_PATH . 'sql_log' . DS . $this->dbConfig['db_name'] . DS;
+            $path = DATA_PATH . 'sql_log' . DS . $this->build['database'] . DS;
             is_dir($path) ? '' : mkdir($path, 0755, true);
             if (stripos($this->sqlInfo['sql'], 'select') === 0) {
                 $path .= 'select_' . date('Y_m_d_H', TIME) . '.text';

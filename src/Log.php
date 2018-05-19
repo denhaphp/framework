@@ -5,7 +5,7 @@ class Log
 {
     public static function error($msg = 'no message')
     {
-        if (TRACE) {
+        if (config('trace')) {
             $e['message'] = '<p style="font-size:20px">-.-----..-.-.-.....-... : ' . $msg . '</p>';
             return include FARM_PATH . DS . 'trace' . DS . 'error.html';
         } else {

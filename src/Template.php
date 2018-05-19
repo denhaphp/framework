@@ -24,6 +24,8 @@ class Template
 
         //{$xxx} be echo $xxx;
         $this->content = preg_replace('/' . $this->left . '\$(.*?)' . $this->right . '/is', '<?php echo $\1; ?>', $this->content);
+        //{$xxx|default="xxx"}
+        $this->content = preg_replace('/' . $this->left . '\$(.*?)|default=["\'](.*?)["\']' . $this->right . '/is', '<?php echo isset($\1) ? \1 : \2; ?>', $this->content);
         //??$xx  be !isset($xx) ?: $xx
         $this->content = preg_replace('/' . $this->left . '\?\?(.*?)' . $this->right . '/is', '<?php echo !isset(\1) ? null : \1; ?>', $this->content);
         //机器翻译标签 {FY:xxx:en}
@@ -67,15 +69,15 @@ class Template
             foreach ($matches[1] as $key => $value) {
                 $value = trim(str_replace('/', DS, $value));
                 if (!$value) {
-                    $path = APP_PATH . APP . DS . 'view' . DS . MODULE . DS . CONTROLLER . DS . ACTION . '.html';
+                    $path = VIEW_PATH . DS . MODULE . DS . parseName(CONTROLLER, false) . DS . ACTION . '.html';
                 }
                 //绝对路径 appliaction目录开始
                 elseif (stripos($value, DS) === 0) {
-                    $path = APP_PATH . APP . DS . 'view' . $value . '.html';
+                    $path = VIEW_PATH . $value . '.html';
                 }
                 //相对路径
                 else {
-                    $path = APP_PATH . APP . DS . 'view' . DS . MODULE . DS . $value . '.html';
+                    $path = VIEW_PATH . DS . MODULE . DS . $value . '.html';
                 }
 
                 $path = str_replace('\\', DS, $path);
@@ -85,6 +87,8 @@ class Template
                     $content = fread($file, filesize($path));
                     //替换模板变量
                     $this->content = str_replace($matches[0][$key], $content, $this->content);
+                } else {
+
                 }
             }
         }

@@ -63,7 +63,7 @@ class Trace
     {
         $e = error_get_last();
         if ($e) {
-            if (TRACE) {
+            if (config('trace')) {
                 return include FARM_PATH . DS . 'trace' . DS . 'error.html';
             } else {
                 //FATAL ERROR 发送到邮箱
@@ -103,7 +103,7 @@ class Trace
             }
         }
 
-        if (TRACE) {
+        if (config('trace')) {
             return include FARM_PATH . DS . 'trace' . DS . 'error.html';
         } else {
             //暂时不需提醒
@@ -148,13 +148,9 @@ class Trace
     //获取基本信息
     private static function baseInfo()
     {
-        if (getConfig('db.' . APP_CONFIG)) {
-            $dbConfig = getConfig('db.' . APP_CONFIG);
-        } else {
-            $dbConfig = getConfig('db');
-        }
 
-        $base = array(
+        $config = config();
+        $base   = array(
             '请求信息' => date('Y-m-d H:i:s', $_SERVER['REQUEST_TIME']) . ' ' . $_SERVER['SERVER_PROTOCOL'] . ' ' . $_SERVER['REQUEST_METHOD'] . ' : ' . strip_tags($_SERVER['REQUEST_URI']),
             '运行时间' => (microtime(true)) - $GLOBALS['_beginTime'] . ' s',
             '吞吐率'    => number_format(1 / $GLOBALS['_beginTime'], 2) . 'req/s',
@@ -164,7 +160,7 @@ class Trace
             //'缓存信息' => n('cache_read') . ' gets ' . n('cache_write') . ' writes ',
             //'配置加载' => count(c()),
             '会话信息' => 'SESSION_ID=' . session_id(),
-            '数据库'    => $dbConfig['db_name'],
+            '数据库'    => $config['db_config'][0]['db_name'],
         );
 
         return $base;

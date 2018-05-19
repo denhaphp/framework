@@ -48,15 +48,15 @@ class Controller
 
         if (!$peg) {
             if (!$viewPath) {
-                $path = APP_MAIN_PATH . DS . 'view' . DS . MODULE . DS . CONTROLLER . DS . ACTION . '.html';
+                $path = VIEW_PATH . DS . MODULE . DS . parseName(CONTROLLER, false) . DS . ACTION . '.html';
             }
             //绝对路径
             elseif (stripos($viewPath, '/') === 0) {
-                $path = APP_MAIN_PATH . DS . 'view' . DS . substr($viewPath, 1) . '.html';
+                $path = VIEW_PATH . DS . substr($viewPath, 1) . '.html';
             }
             //相对路径
             else {
-                $path = APP_MAIN_PATH . DS . 'view' . DS . MODULE . DS . $viewPath . '.html';
+                $path = VIEW_PATH . DS . MODULE . DS . $viewPath . '.html';
             }
         } else {
             $path = $viewPath;
