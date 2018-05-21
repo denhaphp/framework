@@ -360,7 +360,8 @@ function comprise($path)
 //如果没有写入权限尝试修改权限 如果修改后还是失败 则跳过
 function isWritable($path)
 {
-    if (!is_writable($path)) {
+
+    if (!is_writable($path) && $path) {
         chmod($path, 0755);
         if (!is_writable($path)) {
             return false;

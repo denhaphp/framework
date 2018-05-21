@@ -16,6 +16,7 @@ class Start
      */
     public static function up($route = 'mca')
     {
+
         //执行创建文件
         get('build') == false ?: self::bulid();
 
@@ -26,10 +27,10 @@ class Start
             self::$config = array_merge(include (CONFIG_PATH . 'config.php'), include (CONFIG_PATH . 'config.' . APP . '.php'));
         }
 
-        error_reporting(0);
-        register_shutdown_function('denha\Trace::catchError');
-        set_error_handler('denha\Trace::catchNotice');
-        set_exception_handler('denha\Trace::catchApp');
+        //error_reporting(0);
+        // register_shutdown_function('denha\Trace::catchError');
+        // set_error_handler('denha\Trace::catchNotice');
+        // set_exception_handler('denha\Trace::catchApp');
 
         Start::filter(); //过滤
         $class = Route::main($route); //解析路由
@@ -53,9 +54,8 @@ class Start
             throw new Exception('Class : ' . Route::$class . ' NOT FIND [ ' . $action . ' ] ACTION');
         }
 
-        //待开发 自动生成api接口文档
-        //get('api') == false ?: self::apiDoc(Route::$class, $action);
         $action = $object->$action();
+
     }
 
     /**

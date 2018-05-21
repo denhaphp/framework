@@ -286,7 +286,9 @@ class Route
             $total = count($paramArray);
 
             for ($i = 0; $i < $total;) {
-                $_GET[$paramArray[$i]] = urldecode($paramArray[$i + 1]);
+                if (isset($paramArray[$i + 1])) {
+                    $_GET[$paramArray[$i]] = urldecode($paramArray[$i + 1]);
+                }
                 $i += 2;
             }
         }
