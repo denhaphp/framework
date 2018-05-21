@@ -5,9 +5,8 @@ class HttpTrace
 {
     public static function abort($msg = 'no message', $code = '200')
     {
-
-        header("http/1.1 " . $code);
-        header("status:" . $code);
+        header('http/1.1 ' . $code);
+        header('status: ' . $code);
         if (config('trace')) {
             $e['message'] = '<p style="font-size:20px">-.-----..-.-.-.....-... : ' . $msg . '</p>';
             return include FARM_PATH . DS . 'trace' . DS . 'error.html';

@@ -22,7 +22,7 @@ h1 b{ font-weight:500; font-size: 59px;  display: block;float: right;  margin-to
 
 		<?php echo $e['message']; ?> 
 
-	<?php if(isset($e['file'])){ ?> 
+	<?php if($e['file']){ ?> 
 		from 
 		<font style="color: red;"><?php echo $e['file']; ?> in <?php echo $e['line']; ?></font>
 	<?php } ?>

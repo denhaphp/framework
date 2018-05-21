@@ -27,7 +27,7 @@ class Pages
         }
         $this->allPage = (int) ceil($this->total / $this->pageSize);
         if ($this->pageNo > $this->allPage) {
-            Log::error('请选择正确的页码');
+            abort('请选择正确的页码');
         }
 
         $startPage = 1;

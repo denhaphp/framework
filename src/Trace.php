@@ -100,11 +100,11 @@ class Trace
         if ($error->getTrace()) {
             foreach ($error->getTrace() as $key => $value) {
                 $e['trace'] .= ($key + 1) . ' File :' . $value['file'];
-                if ($value['class']) {
+                if (isset($value['class'])) {
                     $e['trace'] .= ' From Class :' . $value['class'];
                 }
 
-                if ($value['class']) {
+                if (isset($value['class'])) {
                     $e['trace'] .= ' In Function :' . $value['function'];
                 }
 

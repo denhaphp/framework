@@ -1,10 +1,10 @@
 <?php
 //------------------------
-// 图形验证码类
+// 验证码类
 //-------------------------
 namespace denha;
 
-class Captcha
+class ValidateCode
 {
     private $charset = 'abcdefghkmnprstuvwxyzABCDEFGHKMNPRSTUVWXYZ23456789'; //随机因子
     private $code; //验证码
@@ -68,7 +68,6 @@ class Captcha
     //输出
     private function outPut()
     {
-        ob_clean();
         header('Content-type:image/png');
         imagepng($this->img);
         imagedestroy($this->img);

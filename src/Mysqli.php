@@ -289,7 +289,7 @@ class Mysqli
     public function join($table, $where = '', $float = 'left')
     {
         if ($table == $this->table) {
-            denha\Log::error('表与关联表名字相同');
+            abort('表与关联表名字相同');
         }
 
         $where ?: $where = $this->table . '.id =' . $table . '.id';
@@ -926,6 +926,9 @@ class Mysqli
                 $content = $this->sqlInfo['sql'] . ';' . PHP_EOL;
             } elseif (stripos($this->sqlInfo['sql'], 'insert') === 0) {
                 $path .= 'add_' . date('Y_m_d_H', TIME) . '.text';
+                $content = $this->sqlInfo['sql'] . ';' . PHP_EOL;
+            } else {
+                $path .= 'other_' . date('Y_m_d_H', TIME) . '.text';
                 $content = $this->sqlInfo['sql'] . ';' . PHP_EOL;
             }
 
