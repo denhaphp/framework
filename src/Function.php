@@ -1,4 +1,4 @@
-<?php
+ <?php
 function GSF($array, $v)
 {
     foreach ($array as $key => $value) {
@@ -294,6 +294,7 @@ function existsUrl($url)
         $http = $_SERVER['SERVER_NAME'];
         $url  = 'http://' . $http . '/' . $url;
     }
+
     $opts = array(
         'http' => array(
             'timeout' => 30,
@@ -332,9 +333,9 @@ function dao($name, $app = '')
     static $_dao = array();
 
     if (!$app) {
-        $class = 'app\\tools\\dao\\base\\' . $name;
+        $class = 'dao\\base\\' . $name;
     } else {
-        $class = 'app\\tools' . '\\dao\\' . $app . '\\' . $name;
+        $class = 'dao\\' . $app . '\\' . $name;
     }
 
     $value = md5($class);
@@ -348,13 +349,7 @@ function dao($name, $app = '')
         }
     }
     throw new Exception('Dao方法：' . $class . '不存在');
-    //die('Dao方法：' . $class . '不存在');
-}
 
-//包含文件
-function comprise($path)
-{
-    include VIEW_PATH . $path . '.html';
 }
 
 //如果没有写入权限尝试修改权限 如果修改后还是失败 则跳过
@@ -412,12 +407,17 @@ function getVar($filename, $path, $ext = EXT)
  * @author ChenMingjiang
  * @return [type]                   [description]
  */
-function config($name = '')
+function config($name = '', $path = '')
 {
-    if ($name) {
-        $data = denha\Start::$config[$name];
+
+    if ($path) {
+        $data = getConfig($path, $name);
     } else {
-        $data = denha\Start::$config;
+        if ($name) {
+            $data = denha\Start::$config[$name];
+        } else {
+            $data = denha\Start::$config;
+        }
     }
 
     return $data;
@@ -436,7 +436,7 @@ function getConfig($path = 'config', $name = '')
     }
 
     if (isset($_configData[$path])) {
-        if ($name === '') {
+        if ($name === null) {
             return $_configData[$path];
         }
 

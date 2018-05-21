@@ -16,17 +16,20 @@ h1 b{ font-weight:500; font-size: 59px;  display: block;float: right;  margin-to
 	</div>
 	<div style="clear: both;height: 0px;"></div>
 	<div style="font-size: 1rem; line-height: 2rem;font-weight: bolder;">
-		<?php if($e['type']){ ?>
+	<?php if(isset($e['type'])){ ?>
 		<b><?php echo self::$traceErrorType[$e['type']]; ?> </b> 
-		<?php } ?>
+	<?php } ?>
+
 		<?php echo $e['message']; ?> 
-		<?php if($e['file']){ ?> 
+
+	<?php if($e['file']){ ?> 
 		from 
 		<font style="color: red;"><?php echo $e['file']; ?> in <?php echo $e['line']; ?></font>
-		<?php } ?>
-		<?php if(isset($e['trace'])){ ?> 
+	<?php } ?>
+	
+	<?php if(isset($e['trace'])){ ?> 
 		<div class="trace"><p><?php echo str_replace(PHP_EOL,'</p><hr/><p >',$e['trace']); ?></p></div>
-		<?php } ?>
+	<?php } ?>
 	</div>
 </div>
 <?php die;?>

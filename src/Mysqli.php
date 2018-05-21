@@ -644,7 +644,15 @@ class Mysqli
 
         //获取记录条数
         $this->total = mysqli_num_rows($result);
-        if ($this->total == 0) {return false;}
+        if ($this->total == 0) {
+            if ($value == 'array') {
+                return array();
+            } elseif ($value == 'one') {
+                return null;
+            } else {
+                return '';
+            }
+        }
 
         //单个字段模式
         if ($value == 'one' && !$isArray) {
@@ -695,6 +703,11 @@ class Mysqli
 
             return $data;
         }
+    }
+
+    public function select()
+    {
+
     }
 
     /**

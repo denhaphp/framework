@@ -24,7 +24,7 @@ class Smtp
 
     public function init($group)
     {
-        $smtp = getConfig('smtp'); //获取stmp配置信息
+        $smtp = config(null, 'smtp'); //获取stmp配置信息
 
         $this->debug      = false;
         $this->smtp_port  = $smtp[$group]['smtp_port'];

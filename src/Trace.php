@@ -55,6 +55,14 @@ class Trace
             $type = isset(self::$traceErrorType[$level]) ? self::$traceErrorType[$level] : 'unknown';
             $info = $type . ' : ' . $message . ' from ' . $file . ' on ' . $line;
             self::addErrorInfo($info);
+
+            $e = array(
+                'message' => $type . ' : ' . $message,
+                'file'    => $file,
+                'line'    => $line,
+            );
+
+            return include FARM_PATH . DS . 'trace' . DS . 'error.html';
         }
     }
 
@@ -67,11 +75,12 @@ class Trace
                 return include FARM_PATH . DS . 'trace' . DS . 'error.html';
             } else {
                 //FATAL ERROR 发送到邮箱
-                if (getConfig('config', 'send_debug_mail')) {
+                if (config('send_debug_mail')) {
                     $title   = $_SERVER['HTTP_HOST'] . ' 有一个致命错误 ip:' . getIP() . ' ' . $_SERVER['SERVER_PROTOCOL'];
                     $content = $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'] . PHP_EOL . 'FATAL ERROR : ' . $e['message'] . ' from ' . $e['file'] . ' on line ' . $e['line'];
-                    dao('Mail')->send(getConfig('config', 'send_mail'), $title, $content);
+                    dao('Mail')->send(config('send_mail'), $title, $content);
                 }
+
                 header("http/1.1 404 not found");
                 header("status: 404 not found");
                 return include FARM_PATH . DS . 'trace' . DS . '404.html';
@@ -106,12 +115,7 @@ class Trace
         if (config('trace')) {
             return include FARM_PATH . DS . 'trace' . DS . 'error.html';
         } else {
-            //暂时不需提醒
-            /*if (getConfig('config', 'send_debug_mail')) {
-            $title   = $_SERVER['HTTP_HOST'] . ' 有一个致命错误';
-            $content = $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'] . PHP_EOL . $e['message'] . ' from ' . $e['file'] . ' on line ' . $e['line'] . PHP_EOL . $e['trace'];
-            dao('Mail')->send(getConfig('config', 'send_mail'), $title, $content);
-            }*/
+
             header("http/1.1 404 not found");
             header("status: 404 not found");
             return include FARM_PATH . DS . 'trace' . DS . '404.html';

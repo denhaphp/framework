@@ -103,9 +103,9 @@ class Template
             foreach ($matches[0] as $key => $value) {
                 if (stripos($matches[2][$key], ' ') !== false) {
                     $rowTmp        = explode(' ', $matches[2][$key]);
-                    $this->content = str_replace($matches[0][$key], '<?php if(' . $matches[1][$key] . '){ foreach(' . $matches[1][$key] . ' as ' . trim($rowTmp[0]) . ' => ' . trim($rowTmp[1]) . '){ ?>', $this->content);
+                    $this->content = str_replace($matches[0][$key], '<?php if(!empty(' . $matches[1][$key] . ')){ foreach(' . $matches[1][$key] . ' as ' . trim($rowTmp[0]) . ' => ' . trim($rowTmp[1]) . '){ ?>', $this->content);
                 } else {
-                    $this->content = str_replace($matches[0][$key], '<?php if(' . $matches[1][$key] . '){ foreach(' . $matches[1][$key] . ' as ' . $matches[2][$key] . '){ ?>', $this->content);
+                    $this->content = str_replace($matches[0][$key], '<?php if(!empty(' . $matches[1][$key] . ')){ foreach(' . $matches[1][$key] . ' as ' . $matches[2][$key] . '){ ?>', $this->content);
                 }
             }
 
