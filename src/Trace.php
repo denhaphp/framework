@@ -52,17 +52,22 @@ class Trace
     public static function catchNotice($level, $message, $file, $line)
     {
         if ($level) {
+
+            $debugContent = self::getFileContent($file, $line);
+
             $type = isset(self::$traceErrorType[$level]) ? self::$traceErrorType[$level] : 'unknown';
             $info = $type . ' : ' . $message . ' from ' . $file . ' on ' . $line;
             self::addErrorInfo($info);
 
-            $e = array(
-                'message' => $type . ' : ' . $message,
-                'file'    => $file,
-                'line'    => $line,
-            );
+            if (config('trace')) {
+                $e = array(
+                    'message' => $type . ' : ' . $message,
+                    'file'    => $file,
+                    'line'    => $line,
+                );
 
-            return include FARM_PATH . DS . 'trace' . DS . 'error.html';
+                return include FARM_PATH . DS . 'trace' . DS . 'error.html';
+            }
         }
     }
 
@@ -71,6 +76,9 @@ class Trace
     {
         $e = error_get_last();
         if ($e) {
+
+            $debugContent = self::getFileContent($e['file'], $e['line']);
+
             if (config('trace')) {
                 return include FARM_PATH . DS . 'trace' . DS . 'error.html';
             } else {
@@ -96,6 +104,8 @@ class Trace
         $e['file']    = $error->getFile();
         $e['line']    = $error->getLine();
         $e['trace']   = '';
+
+        $debugContent = self::getFileContent($e['file'], $e['line']);
 
         if ($error->getTrace()) {
             foreach ($error->getTrace() as $key => $value) {
@@ -149,6 +159,33 @@ class Trace
         }
     }
 
+    /** 获取文件代码 */
+    private static function getFileContent($file, $line)
+    {
+        $content = '';
+
+        if (is_file($file)) {
+
+            $fp = new \SplFileObject($file, 'r');
+            $fp->seek($i = max($line - 10, 0)); // 转到第N行, seek方法参数从0开始计数
+
+            $count = $line + 10;
+            for (; $i <= $count; ++$i) {
+                $content .= $i . ' ' . trim($fp->current()) . PHP_EOL; // current()获取当前行内容
+                if ($i == $line) {
+
+                }
+
+                $fp->next(); // 下一行
+            }
+
+            $content = '<pre>' . htmlspecialchars($content) . '</pre>';
+
+        }
+
+        return $content;
+    }
+
     //获取基本信息
     private static function baseInfo()
     {
@@ -159,12 +196,12 @@ class Trace
             '运行时间' => (microtime(true)) - $GLOBALS['_beginTime'] . ' s',
             '吞吐率'    => number_format(1 / $GLOBALS['_beginTime'], 2) . 'req/s',
             '内存开销' => MEMORY_LIMIT_ON ? number_format((memory_get_usage() - $GLOBALS['_startUseMems']) / 1024, 2) . ' kb' : '不支持',
-            //'查询信息' => n('db_query') . ' queries ' . n('db_write') . ' writes ',
             '文件加载' => count(get_included_files()),
             //'缓存信息' => n('cache_read') . ' gets ' . n('cache_write') . ' writes ',
             //'配置加载' => count(c()),
             '会话信息' => 'SESSION_ID=' . session_id(),
             '数据库'    => $config['db_config'][0]['db_name'],
+            '磁盘信息' => number_format($GLOBALS['_diskTotalSpace'] / 1024 / 1024 / 1024, 3) . ' G (all) / ' . number_format(($GLOBALS['_diskTotalSpace'] - $GLOBALS['_diskFreeSpace']) / 1024 / 1024 / 1024, 3) . ' G (use) / ' . number_format($GLOBALS['_diskFreeSpace'] / 1024 / 1024 / 1024, 3) . 'G (free)',
         );
 
         return $base;

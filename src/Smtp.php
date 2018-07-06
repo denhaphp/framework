@@ -138,8 +138,8 @@ class Smtp
             fclose($this->sock);
             $this->log_write('Disconnected from remote host' . PHP_EOL);
         }
-        echo "<br>";
-        echo $header;
+        //echo "<br>";
+        //echo $header;
         return $sent;
     }
 

@@ -68,9 +68,11 @@ class ValidateCode
     //输出
     private function outPut()
     {
+        ob_clean();
         header('Content-type:image/png');
         imagepng($this->img);
         imagedestroy($this->img);
+        die;
     }
 
     //对外生成

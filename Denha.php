@@ -42,4 +42,7 @@ if (!IS_CLI) {
     define('IS_AJAX', (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && (strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest')) || !empty($_POST['ajax']) || !empty($_GET['ajax']) ? true : false);
 }
 
+$GLOBALS['_diskTotalSpace'] = disk_total_space(ROOT_PATH);
+$GLOBALS['_diskFreeSpace']  = disk_free_space(ROOT_PATH);
+
 require_once VENDOR_PATH . 'autoload.php';

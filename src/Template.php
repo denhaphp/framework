@@ -24,8 +24,8 @@ class Template
 
         //{$xxx} be echo $xxx;
         $this->content = preg_replace('/' . $this->left . '\$(.*?)' . $this->right . '/is', '<?php echo $\1; ?>', $this->content);
-        //{$xxx|default="xxx"}
-        $this->content = preg_replace('/' . $this->left . 'INIT:\$(.*?)[|](.*?)' . $this->right . '/is', '<?php echo isset($\1) ? $\1 : \2 ; ?>', $this->content);
+        //{default:$xxx|"xxx"}
+        $this->content = preg_replace('/' . $this->left . 'default:\$(.*?)[|](.*?)' . $this->right . '/is', '<?php echo isset($\1) ? $\1 : \2 ; ?>', $this->content);
         //??$xx  be !isset($xx) ?: $xx
         $this->content = preg_replace('/' . $this->left . '\?\?(.*?)' . $this->right . '/is', '<?php echo !isset(\1) ? null : \1; ?>', $this->content);
         //机器翻译标签 {FY:xxx:en}

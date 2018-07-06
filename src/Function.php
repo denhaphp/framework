@@ -1,7 +1,4 @@
  <?php
-
-use denha\HttpTrace;
-
 function GSF($array, $v)
 {
     foreach ($array as $key => $value) {
@@ -44,7 +41,7 @@ function GSS($value)
  */
 function abort($msg, $code = '200')
 {
-    return HttpTrace::abort($msg, $code);
+    return denha\HttpTrace::abort($msg, $code);
 }
 
 /**
@@ -59,10 +56,10 @@ function abort($msg, $code = '200')
  */
 function auth($string, $operation = 'ENCODE', $key = '', $expiry = 0)
 {
-    $key = $key ? $key : \denha\Start::$config['authKey'];
+    $key = $key ? $key : config('auth_key');
 
     $ckey_length = 4;
-    $key         = md5($key != '' ? $key : getConfig('config', 'authKey'));
+    $key         = md5($key != '' ? $key : config('auth_key'));
     $keya        = md5(substr($key, 0, 16));
     $keyb        = md5(substr($key, 16, 16));
     $keyc        = $ckey_length ? ($operation == 'DECODE' ? substr($string, 0, $ckey_length) : substr(md5(microtime()), -$ckey_length)) : '';
@@ -131,24 +128,40 @@ function config($name = '', $path = '')
 }
 
 //保存Cookie
-function cookie($name = '', $value = '', $expire = 3600, $encode = false)
+function cookie($name = '', $value = '', $options = array())
 {
+
+    $config = array_merge(denha\Start::$config['cookie'], array_change_key_case((array) $options));
+
     if (!$name) {
         return false;
     }
+
+    $name   = $config['prefix'] ? $config['prefix'] . $name : $name;
+    $expire = $config['expire'] ? TIME + $config['expire'] : 0;
 
     if (is_array($value)) {
         $value = json_encode($value);
     }
 
     if ($value === '') {
-        return getCookie($name, $encode);
+        if (isset($_COOKIE[$name])) {
+            $data = $_COOKIE[$name];
+            $data = $config['auth'] ? auth($data, 'DECODE') : $data;
+            if (stripos($data, '{') !== false) {
+                $data = json_decode($data, true);
+            }
+        }
+
+        return isset($data) ? $data : '';
     }
 
-    //加密
-    $value = $encode ? auth($value) : $value;
+    //内容加密
+    if ($config['auth']) {
+        $value = auth($value);
+    }
 
-    setcookie($name, $value, time() + $expire, '/');
+    setcookie($name, $value, $expire, $config['path'], $config['domain']);
 
 }
 
@@ -213,6 +226,25 @@ function enUnicode($name, $code = 'UTF-8')
     return $str;
 }
 
+// ENCODE为加密，DECODE为解密
+function zipStr($value, $operation = 'ENCODE')
+{
+    if ($operation == 'ENCODE') {
+        $value = is_array($value) ? json_encode($value) : $value;
+        $value = gzcompress($value, 9);
+        $value = base64_encode($value);
+        $value = str_replace(array('+', '/', '='), array('-', '_', ''), $value);
+    } elseif ($operation == 'DECODE') {
+        $value = str_replace(array('-', '_', ''), array('+', '/', '='), $value);
+
+        $value = base64_decode($value);
+        $value = gzuncompress($value);
+    }
+
+    return $value;
+
+}
+
 function files($name)
 {
     if (isset($_FILES[$name])) {
@@ -237,10 +269,11 @@ function get($name, $type = '', $default = '')
 {
     $data = null;
     if ($name == 'all') {
-
         foreach ($_GET as $key => $val) {
-            $val        = trim($val);
-            $data[$key] = !get_magic_quotes_gpc() ? htmlspecialchars(addslashes($val), ENT_QUOTES, 'UTF-8') : htmlspecialchars($val, ENT_QUOTES, 'UTF-8');
+            if (!is_array($val)) {
+                $val        = trim($val);
+                $data[$key] = !get_magic_quotes_gpc() ? htmlspecialchars(addslashes($val), ENT_QUOTES, 'UTF-8') : htmlspecialchars($val, ENT_QUOTES, 'UTF-8');
+            }
         }
 
     } else {
@@ -370,23 +403,6 @@ function getIP()
     return $ip;
 }
 
-//获取Cookie
-function getCookie($name, $encode = false)
-{
-    $data = '';
-    if (isset($_COOKIE[$name])) {
-        $data = $_COOKIE[$name];
-
-        $data = $encode ? auth($data, 'DECODE') : $data;
-        if (stripos($data, '{') !== false) {
-            $data = json_decode($data, true);
-        }
-
-    }
-
-    return $data;
-}
-
 /**
  * 获取数组的维度
  * @date   2018-05-21T15:48:29+0800
@@ -456,19 +472,6 @@ function imgUrl($name, $path = '', $size = 0, $host = false)
 
             $url = !$host ? $url : $host . $url;
 
-            //这块有点影响网速 设置超时 后续会改为检测数据库
-            /*$opts = array(
-        'http' => array(
-        'method'  => "GET",
-        'timeout' => 1, //单位秒
-        ),
-        );
-
-        if (!file_get_contents($url, false, stream_context_create($opts))) {
-        $url = '/ststic/default.png';
-        $url = !$host ? URL . $url : $host . $url;
-        }*/
-
         }
 
         $data[] = $url;
@@ -493,6 +496,7 @@ function response($url, $method = 'GET', $param = array(), $headers = array(), $
 
     $isJson = isset($options['is_json']) ? $options['is_json'] : true;
     $debug  = isset($options['debug']) ? $options['debug'] : false;
+    $ssl    = isset($options['ssl']) ? $options['ssl'] : array();
 
     $ch = curl_init(); //初始化curl
 
@@ -526,8 +530,30 @@ function response($url, $method = 'GET', $param = array(), $headers = array(), $
             break;
     }
 
+    //设置请求头
+    if (count($headers) > 0) {
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    }
+
+    // 证书认证
+    if (!empty($options['ssl'])) {
+        foreach ($options['ssl'] as $key => $value) {
+            if (is_file($value)) {
+                if ($key == 'CERT') {
+                    curl_setopt($ch, CURLOPT_SSLCERTTYPE, 'PEM');
+                    curl_setopt($ch, CURLOPT_SSLCERT, $value);
+                } elseif ($key == 'KEY') {
+                    curl_setopt($ch, CURLOPT_SSLKEYTYPE, 'PEM');
+                    curl_setopt($ch, CURLOPT_SSLKEY, $value);
+                }
+            } else {
+                throw new Exception('Curl错误 : ssl证书文件地址错误 -- ' . $value);
+            }
+
+        }
+    }
+
     curl_setopt($ch, CURLOPT_HEADER, 0); // 是否显示返回的Header区域内容
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers); //设置请求头
     curl_setopt($ch, CURLOPT_AUTOREFERER, 1); // 自动设置Referer
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1); // 获取的信息以文件流的形式返回
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0); // 从证书中检查SSL加密算法是否存在
@@ -550,6 +576,9 @@ function response($url, $method = 'GET', $param = array(), $headers = array(), $
         print_r('-------END-----' . PHP_EOL);
         print_r('-------输入参数header-----' . PHP_EOL);
         print_r($headers);
+        print_r('-------END-----' . PHP_EOL);
+        print_r('-------输入参数options-----' . PHP_EOL);
+        print_r($options);
         print_r('-------END-----' . PHP_EOL);
         print_r('-------请求Code-----' . PHP_EOL);
         print_r($code . PHP_EOL);
@@ -604,7 +633,9 @@ function session($name = '', $value = '')
     }
     //保存
     else {
-        session_start();
+        if (empty($_SESSION)) {
+            session_start();
+        }
 
         // 数组
         if (is_array($name)) {
@@ -658,38 +689,47 @@ function table($name, $isTablepre = true)
 
 /**
  * 创建url
- * @date   2017-10-11T15:44:44+0800
+ * ------------------------
+ * | {F:url()} to /MODULE/CONTROLLER/ACTION
+ * | {F:url('xxxx')} to /MODULE/CONTROLLER/xxx
+ * | {F:url('/aaa/bbb/ccc/ddd')} to /aaa/bbb/ccc/ddd
+ * | {F:url('aaa/bbbb')} to /MODULE/aaa/bbb
+ * ------------------------
+ * @date   2018-07-06T10:50:29+0800
  * @author ChenMingjiang
- * @param  string                   $location [请求地址]
- * @param  array                    $params   [参数数组]
- * @param  boolean                  $isGet    [开启伪静态 true关闭 false开启]
+ * @param  [type]                   $location [请求URL]
+ * @param  array                    $params   [description]
+ * @param  array                    $options  [description]
  * @return [type]                             [description]
  */
-function url($location = '', $params = array(), $url = '', $isGet = false)
+function url($location = null, $params = [], $options = [])
 {
+    $hostUrl = isset($options['host']) ? isset($options['host']) : URL; // 前缀域名
+    $isGet   = isset($options['is_get']) ? isset($options['is_get']) : true; // 开启伪静态 true开启 false关闭
 
-    $locationUrl = MODULE ? $url . '/' . MODULE : $url;
-    if ($location === '') {
-        $locationUrl .= '/' . CONTROLLER . '/' . ACTION;
-    } elseif (stripos($location, '/') === false && $location != '') {
-        $locationUrl .= '/' . CONTROLLER . '/' . $location;
+    if ($location === null) {
+        $routeUrl = '/' . str_replace('.', '/', MODULE) . '/' . CONTROLLER . '/' . ACTION;
+    } elseif (stripos($location, '/') === false && $location != null) {
+        $routeUrl = '/' . str_replace('.', '/', MODULE) . '/' . CONTROLLER . '/' . $location;
+    } elseif (stripos($location, '/') !== false && stripos($location, '/') !== 0 && $location != null) {
+        $routeUrl = '/' . str_replace('.', '/', MODULE) . '/' . $location;
     } elseif (stripos($location, '/') === 0) {
-        $locationUrl = $url . $location;
+        $routeUrl = $location;
     } else {
-        $locationUrl .= '/' . $location;
+        $routeUrl = $location;
     }
 
     $param = '';
     if (!empty($params)) {
         foreach ($params as $key => $value) {
-            if ($isGet) {
-                if (key($params) === $key && stripos($locationUrl, '?') === false) {
+            if (!$isGet) {
+                if (key($params) === $key && stripos($routeUrl, '?') === false) {
                     $param = '?' . $key . '=' . $value;
                 } else {
                     $param .= '&' . $key . '=' . $value;
                 }
             } else {
-                if (key($params) === $key && stripos($locationUrl, '?') === false) {
+                if (key($params) === $key && stripos($routeUrl, '?') === false) {
                     $param .= '/s/' . $key . '/' . $value;
                 } else {
                     $param .= '/' . $key . '/' . $value;
@@ -699,7 +739,10 @@ function url($location = '', $params = array(), $url = '', $isGet = false)
         }
     }
 
-    return $locationUrl . $param;
+    // 检查规则路由
+    $uri = dao('RouteRule')->getRouteChangeUrl($routeUrl . $param);
+
+    return $hostUrl . $uri;
 }
 
 function parseName($name, $type = false)
@@ -758,10 +801,19 @@ function post($name, $type = '', $default = '')
                 $data = $data === '' ? $default : json_decode($data, true);
                 break;
             case 'img':
-                $data = stripos($data, 'default') !== false ? $default : $data;
-                if (stripos($data, 'http') !== false || stripos($data, '/') !== false) {
-                    $data = pathinfo($data, PATHINFO_BASENAME);
-                }
+                $data = explode(',', $data);
+                $data = array_map(function ($value) use ($default) {
+
+                    $value = stripos($value, 'default') !== false ? $default : $value;
+                    if (stripos($value, 'http') !== false || stripos($value, '/') !== false || stripos($value, 'https') !== false) {
+                        $value = pathinfo($value, PATHINFO_BASENAME);
+                    }
+
+                    return $value;
+                }, $data);
+
+                $data = implode(',', $data);
+
                 break;
             case 'time':
                 if (stripos($data, '-') !== false) {
@@ -769,11 +821,12 @@ function post($name, $type = '', $default = '')
                 }
                 break;
             default:
-                # code...
+                $data = '';
                 break;
         }
     }
-    return $data;
+
+    return isset($data) ? $data : '';
 }
 
 function put($name, $type = '', $default = '')
@@ -808,4 +861,30 @@ function ping($address)
         $status = false;
     }
     return $status;
+}
+
+if (!function_exists('isMobile')) {
+    /**
+     * 判断是否是手机访问
+     * @date   2018-05-28T11:30:29+0800
+     * @author ChenMingjiang
+     * @return boolean                  [description]
+     */
+    function isMobile()
+    {
+        // 先检查是否为wap代理，准确度高
+        if (!empty($_SERVER['HTTP_VIA']) && stristr($_SERVER['HTTP_VIA'], "wap")) {
+            return true;
+        }
+        // 检查浏览器是否接受 WML.
+        elseif (strpos(strtoupper($_SERVER['HTTP_ACCEPT']), "VND.WAP.WML") > 0) {
+            return true;
+        }
+        //检查USER_AGENT
+        elseif (preg_match('/(blackberry|configuration\/cldc|hp |hp-|htc |htc_|htc-|iemobile|kindle|midp|mmp|motorola|mobile|nokia|opera mini|opera |Googlebot-Mobile|YahooSeeker\/M1A1-R2D2|android|iphone|ipod|mobi|palm|palmos|pocket|portalmmm|ppc;|smartphone|sonyericsson|sqh|spv|symbian|treo|up.browser|up.link|vodafone|windows ce|xda |xda_)/i', $_SERVER['HTTP_USER_AGENT'])) {
+            return true;
+        } else {
+            return false;
+        }
+    }
 }

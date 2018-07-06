@@ -7,6 +7,7 @@ body{ background: #C7EDCC; font-family: "Century Gothic","Microsoft yahei"; colo
 h1{ font-size: 94px; font-weight: normal;  display: block;float: left;letter-spacing:-6px;} 
 h1 b{ font-weight:500; font-size: 59px;  display: block;float: right;  margin-top: 70px;}
 .trace p{font-size: 0.5rem;}
+.debug{ overflow: auto; }
 </style>
 <div style="width: 1000px; margin: 0 auto;"> 
 	<div style="background: #70DB93; width: 150px; height: 150px; float: left; margin-right: 5px; margin-top: 20px;"></div>
@@ -16,20 +17,26 @@ h1 b{ font-weight:500; font-size: 59px;  display: block;float: right;  margin-to
 	</div>
 	<div style="clear: both;height: 0px;"></div>
 	<div style="font-size: 1rem; line-height: 2rem;font-weight: bolder;">
-	<?php if(isset($e['type'])){ ?>
+	<?php if(!empty($e['type']) && !empty(self::$traceErrorType[$e['type']])){ ?>
 		<b><?php echo self::$traceErrorType[$e['type']]; ?> </b> 
 	<?php } ?>
 
-		<?php echo $e['message']; ?> 
+		<?php echo !empty($e['message']) ? $e['message'] : ''; ?> 
 
-	<?php if($e['file']){ ?> 
+	<?php if(!empty($e['file'])){ ?> 
 		from 
 		<font style="color: red;"><?php echo $e['file']; ?> in <?php echo $e['line']; ?></font>
 	<?php } ?>
 	
-	<?php if(isset($e['trace'])){ ?> 
+	<?php if(!empty($e['trace'])){ ?> 
 		<div class="trace"><p><?php echo str_replace(PHP_EOL,'</p><hr/><p >',$e['trace']); ?></p></div>
 	<?php } ?>
 	</div>
+	
+	<?php if(!empty($debugContent)){ ?> 
+	<div class="debug">
+		<?php echo $debugContent; ?>
+	</div>
+	<?php } ?>
 </div>
 <?php die;?>

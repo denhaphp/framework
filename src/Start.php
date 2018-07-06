@@ -17,9 +17,6 @@ class Start
     public static function up($route = 'mca')
     {
 
-        //执行创建文件
-        get('build') == false ?: self::bulid();
-
         self::$client = APP_CONFIG;
         //获取配置文档信息
         self::$config = include CONFIG_PATH . 'config.php';
@@ -31,6 +28,8 @@ class Start
         register_shutdown_function('denha\Trace::catchError');
         set_error_handler('denha\Trace::catchNotice');
         set_exception_handler('denha\Trace::catchApp');
+
+        Start::checkDisk(); //检测磁盘容量
 
         Start::filter(); //过滤
         $class = Route::main($route); //解析路由
@@ -85,37 +84,18 @@ class Start
         }
     }
 
-    //自动创建文件夹
-    private static function apiDoc($class, $action)
+    //检测磁盘容量
+    private static function checkDisk()
     {
-        $doc = new \ReflectionMethod($class, $action);
-        $tmp = $doc->getDocComment();
+        if (self::$config['check_disk']) {
 
-    }
+            $free = number_format($GLOBALS['_diskFreeSpace'] / 1024 / 1024 / 1024, 2);
+            if (self::$config['disk_space'] >= $free) {
+                $title = $_SERVER['HTTP_HOST'] . ' 磁盘容量不足' . self::$config['disk_space'] . 'G ip:' . getIP() . ' ' . $_SERVER['SERVER_PROTOCOL'];
+                dao('Mail')->send(config('send_mail'), $title, $title, array('save_log' => false));
 
-    //自动创建文件夹
-    private static function bulid()
-    {
-        $dir = [
-            'controller' => ['index'],
-            'tools'      => ['dao', 'vendor', 'util', 'var'],
-            'view'       => ['index'],
-        ];
-
-        $path = APP_PATH . APP . DS;
-        foreach ($dir as $key => $value) {
-            if (!is_dir($path . $key)) {
-                mkdir($path . $key, 0077, true);
-                if (is_array($value)) {
-                    foreach ($dir[$key] as $k => $v) {
-                        if (!is_dir($path . $key . DS . $v)) {
-                            mkdir($path . $key . DS . $v, 0077, true);
-                        }
-                    }
-                }
             }
         }
-
-        die('创建成功');
     }
+
 }

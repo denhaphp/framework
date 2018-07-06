@@ -199,71 +199,89 @@ class Mysqli
         return $result;
     }
 
+    private function addFieldTag($field)
+    {
+        if (strripos($field, '`') === false && $field != '_string') {
+            $field = strripos($field, '.') !== false ? str_replace('.', '.`', $field) . '`' : '`' . $field . '`';
+        }
+
+        return $field;
+    }
+
     /**
      * 查询条件
-     * @date   2017-03-19T16:18:18+0800
+     * @date   2018-06-29T15:50:51+0800
      * @author ChenMingjiang
      * @param  [type]                   $where [description]
+     * @param  [type]                   $value [description]
+     * @param  [type]                   $exp   [description]
      * @return [type]                          [description]
      */
-    public function where($where, $value = null)
+    public function where($where, $value = null, $exp = null)
     {
+
+        $expRule[0] = ['>', '<', '>=', '<=', '!=', 'like', '<>'];
+        $expRule[1] = ['in', 'not in', 'IN', 'NOT IN'];
+        $expRule[2] = ['instr', 'INSTR'];
+        $expRule[3] = ['between', 'BETWEEN'];
+        $expRule[4] = ['or', 'OR'];
 
         if (!$where) {
             return $this;
         }
 
         $newWhere = '';
-        if ($value !== null && !is_array($where)) {
-            $newWhere = $where . ' = \'' . $value . '\' AND ';
-        } else {
-            if (is_array($where)) {
-                foreach ($where as $k => $v) {
 
-                    if (strripos($k, '`') === false && $k != '_string') {
-                        $k = strripos($k, '.') !== false ? str_replace('.', '.`', $k) . '`' : '`' . $k . '`';
-                    }
+        if ($value !== null && $exp !== null) {
+            $map[$where] = [$value, $exp];
+            $where       = $map;
+        } elseif ($value !== null && $exp === null) {
+            $map[$where] = $value;
+            $where       = $map;
+        }
 
-                    if (is_array($v)) {
-                        if ($v[0] == '>' || $v[0] == '<' || $v[0] == '>=' || $v[0] == '<=' || $v[0] == '!=' || $v[0] == 'like') {
-                            $newWhere .= $k . '  ' . $v[0] . ' \'' . $v[1] . '\' AND ';
-                        } elseif ($v[0] == 'in' || $v['0'] == 'not in') {
-                            if (!$v[1]) {
-                                $newWhere .= $k . '  ' . $v[0] . ' (\'\') AND ';
-                            } else {
+        if (is_array($where)) {
+            foreach ($where as $mapField => $v) {
 
-                                if (stripos($v[1], ',') !== false && !is_array($v[1])) {
-                                    $v[1] = explode(',', $v[1]);
-                                }
+                $mapField = $this->addFieldTag($mapField);
 
-                                $v[1] = is_array($v[1]) ? $v[1] : (array) $v[1];
+                if (is_array($v)) {
 
-                                $commonInValue = '';
-                                foreach ($v[1] as $inValue) {
+                    list($mapExp, $mapValue) = $v;
 
-                                    $commonInValue .= '\'' . $inValue . '\',';
-                                }
-
-                                $commonInValue = substr($commonInValue, 0, -1);
-
-                                $newWhere .= $k . '  ' . $v[0] . ' (' . $commonInValue . ') AND ';
+                    if (in_array($mapExp, $expRule[0])) {
+                        $newWhere .= $mapField . '  ' . $mapExp . ' \'' . $mapValue . '\' AND ';
+                    } elseif (in_array($mapExp, $expRule[1])) {
+                        if (!$mapValue) {
+                            $newWhere .= $mapField . '  ' . $mapExp . ' (\'\') AND ';
+                        } else {
+                            if (!is_array($mapValue) && stripos($mapValue, ',') !== false) {
+                                $mapValue = explode(',', $mapValue);
                             }
-                        } elseif ($v[0] == 'instr') {
-                            $newWhere .= $v[0] . '(' . $k . ',\'' . $v[1] . '\') AND ';
-                        } elseif ($v[0] == 'between') {
-                            $newWhere .= $k . '  ' . $v[0] . ' \'' . $v[1] . '\' AND \'' . $v[2] . '\' AND ';
-                        } elseif ($v[0] == 'or') {
-                            $newWhere .= $k . ' = \'' . $v[1] . '\' OR ';
+                            $mapValue      = is_array($mapValue) ? $mapValue : (array) $mapValue;
+                            $commonInValue = '';
+                            foreach ($mapValue as $inValue) {
+                                $commonInValue .= '\'' . $inValue . '\',';
+                            }
+                            $commonInValue = substr($commonInValue, 0, -1);
+                            $newWhere .= $mapField . '  ' . $mapExp . ' (' . $commonInValue . ') AND ';
                         }
-                    } elseif ($k == '_string') {
-                        $newWhere .= $v . ' AND ';
-                    } else {
-                        $newWhere .= $k . ' = \'' . $v . '\' AND ';
+                    } elseif (in_array($mapExp, $expRule[2])) {
+                        $newWhere .= $mapExp . '(' . $mapField . ',\'' . $mapValue . '\') AND ';
+                    } elseif (in_array($mapExp, $expRule[3])) {
+
+                        $newWhere .= $mapField . '  ' . $mapExp . ' \'' . $mapValue . '\' AND \'' . $v[2] . '\' AND ';
+                    } elseif (in_array($mapExp, $expRule[4])) {
+                        $newWhere .= $mapField . ' = \'' . $mapValue . '\' OR ';
                     }
+                } elseif ($mapField == '_string') {
+                    $newWhere .= $v . ' AND ';
+                } else {
+                    $newWhere .= $mapField . ' = \'' . $v . '\' AND ';
                 }
-            } else {
-                $newWhere = $where;
             }
+        } else {
+            $newWhere = $where;
         }
 
         if (stripos($this->where, 'WHERE') === false) {
@@ -273,7 +291,6 @@ class Mysqli
         }
 
         $this->build['where'] = $where;
-
         return $this;
     }
 
@@ -502,8 +519,9 @@ class Mysqli
             $sql .= $this->group;
         }
 
-        $result      = $this->query($sql);
-        $this->total = mysqli_num_rows($result);
+        $result = $this->query($sql);
+
+        $this->total = $result ? mysqli_num_rows($result) : 0;
 
         if ($field) {
             return (int) $this->total;
@@ -647,8 +665,10 @@ class Mysqli
         if ($this->total == 0) {
             if ($value == 'array') {
                 return array();
-            } elseif ($value == 'one') {
+            } elseif ($value == 'one' && !$isArray) {
                 return null;
+            } elseif ($value == 'one' && $isArray) {
+                return array();
             } else {
                 return '';
             }
@@ -658,7 +678,7 @@ class Mysqli
         if ($value == 'one' && !$isArray) {
             $row = mysqli_fetch_array($result, MYSQLI_NUM);
             if (empty($row)) {
-                return false;
+                return null;
             }
 
             return $row[0];
@@ -672,8 +692,9 @@ class Mysqli
             }
 
             if (empty($data)) {
-                return false;
+                return array();
             }
+
             return $data;
         }
         //三维数组模式
@@ -724,7 +745,7 @@ class Mysqli
         foreach ($data as $k => $v) {
             $v = str_replace('\'', '\\\'', $v);
             $v = str_replace('\\', '\\/\\', $v);
-            $newField .= '`' . $k . '` = \'' . $v . '\',';
+            $newField .= $this->addFieldTag($k) . ' = \'' . $v . '\',';
         }
 
         $newField    = substr($newField, 0, -1);
@@ -865,9 +886,22 @@ class Mysqli
             $this->addSqlLog(); //存入文件中
             return $result;
         } else {
-            Trace::addErrorInfo('[SQL ERROR] ' . $this->_sql);
-            $this->addErrorSqlLog(); //存入文件
+
+            //存入文件
+            if ($this->dbConfig['db_save_log']) {
+                $this->addErrorSqlLog();
+            }
+
+            if (config('debug')) {
+                throw new Exception('SQL ERROR : ' . $this->_sql);
+            }
+
+            if (config('trace')) {
+                Trace::addErrorInfo('[SQL ERROR] ' . $this->_sql);
+            }
+
             return false;
+
         }
 
     }
@@ -882,9 +916,12 @@ class Mysqli
 
             $time = &$this->sqlInfo['time'];
             $info = '------ ' . $time . ' | ' . date('Y-m-d H:i:s', TIME) . ' | ip:' . getIP() . ' | ';
-            $info .= 'Url:' . URL . ' | Controller:' . CONTROLLER . ' | Action:' . ACTION . PHP_EOL;
+            $info .= 'Url:' . URL;
+            //$info .= ' | Controller:' . CONTROLLER;
+            //$info .= ' | Action:' . ACTION;
+            $info .= PHP_EOL;
 
-            $content = $this->sqlInfo['sql'] . ';' . PHP_EOL . '来源：' . getSystem() . getBrowser() . PHP_EOL . '--------------' . PHP_EOL;
+            $content = $this->sqlInfo['sql'] . ';' . PHP_EOL . '来源：' . $_SERVER['HTTP_USER_AGENT'] . PHP_EOL . '--------------' . PHP_EOL;
             $file    = fopen($path, 'a');
             fwrite($file, $content . $info . PHP_EOL);
             fclose($file);
@@ -904,30 +941,45 @@ class Mysqli
             return false;
         }
 
+        // define('CONTROLLER', '未知'); //文件后缀
+        // define('ACTION', '未知'); //文件后缀
+
         //创建文件夹
         is_dir(DATA_PATH . 'sql_log') ? '' : mkdir(DATA_PATH . 'sql_log', 0755, true);
 
         $time = &$this->sqlInfo['time'];
         $info = '------ ' . $time . ' | ' . date('Y-m-d H:i:s', TIME) . ' | ip:' . getIP() . ' | ';
-        $info .= 'Url:' . URL . ' | Controller:' . CONTROLLER . ' | Action:' . ACTION . PHP_EOL;
+        $info .= 'Url:' . URL;
+        //$info .= ' | Controller:' . CONTROLLER;
+        //$info .= ' | Action:' . ACTION;
+        $info .= PHP_EOL;
 
         //记录sql
         if ($this->sqlInfo && $this->dbConfig['db_save_log']) {
             $path = DATA_PATH . 'sql_log' . DS . $this->build['database'] . DS;
             is_dir($path) ? '' : mkdir($path, 0755, true);
             if (stripos($this->sqlInfo['sql'], 'select') === 0) {
+
                 $path .= 'select_' . date('Y_m_d_H', TIME) . '.text';
                 $content = $this->sqlInfo['sql'] . PHP_EOL;
+
             } elseif (stripos($this->sqlInfo['sql'], 'update') === 0) {
+
                 $path .= 'update_' . date('Y_m_d_H', TIME) . '.text';
                 $content = $this->sqlInfo['sql'] . ';' . PHP_EOL;
+
             } elseif (stripos($this->sqlInfo['sql'], 'delete') === 0) {
+
                 $path .= 'delete_' . date('Y_m_d_H', TIME) . '.text';
                 $content = $this->sqlInfo['sql'] . ';' . PHP_EOL;
+
             } elseif (stripos($this->sqlInfo['sql'], 'insert') === 0) {
+
                 $path .= 'add_' . date('Y_m_d_H', TIME) . '.text';
                 $content = $this->sqlInfo['sql'] . ';' . PHP_EOL;
+
             } else {
+
                 $path .= 'other_' . date('Y_m_d_H', TIME) . '.text';
                 $content = $this->sqlInfo['sql'] . ';' . PHP_EOL;
             }

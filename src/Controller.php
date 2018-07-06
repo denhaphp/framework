@@ -3,52 +3,60 @@ namespace denha;
 
 class Controller
 {
-    public $assign;
+    public static $assign = [];
 
     /**
      * 赋值
      * @date   2017-05-14T21:30:23+0800
      * @author ChenMingjiang
-     * @param  [type]                   $field [description]
-     * @param  [type]                   $value [description]
+     * @param  [type]                   $field [变量名]
+     * @param  [type]                   $value [变量值]
      * @return [type]                          [description]
      */
     protected function assign($name, $value = '')
     {
         if (is_array($name)) {
-            $this->assign = array_merge($this->assign, $name);
+            self::$assign = array_merge(self::$assign, $name);
         } else {
-            $this->assign[$name] = $value;
+            self::$assign[$name] = $value;
         }
+
     }
 
     /**
-     * 视图显示
-     * @date   2017-05-07T21:08:44+0800
+     * [show description]
+     * @date   2018-06-25T20:37:55+0800
      * @author ChenMingjiang
-     * @param  string                   $viewPath [description]
-     * @param  boolean                  $peg      [true 自定义路径]
-     * @return [type]                             [description]
+     * @param  string                   $viewPath       [视图地址]
+     * @param  array                    $viewParamData  [渲染变量值]
+     * @param  array                    $options        [预定义参数]
+     * @return [type]                                   [description]
      */
-    // /XXX 以view开始
-    // XXX/XXXX/XXX 以view/modul 开始
-    // xxxx   以view/modul/controller 开始
-    // ''     如果为空 者为 view/modul/controller/action.html
-    protected function show($viewPath = '', $peg = false, $trace = true)
+    protected function show($viewPath = '', $viewParamData = [], $options = [])
     {
+
+        // true 自定义路径
+        $peg = isset($options['peg']) ? $options['peg'] : false;
+        // 单个视图关闭调试模式
+        $trace = isset($options['trace']) ? $options['trace'] : true;
 
         if (get('all')) {
             extract(get('all'), EXTR_OVERWRITE);
         }
 
-        if ($this->assign) {
+        if (self::$assign) {
             // 模板阵列变量分解成为独立变量
-            extract($this->assign, EXTR_OVERWRITE);
+            extract(self::$assign, EXTR_OVERWRITE);
+        }
+
+        if ($viewParamData) {
+            // 模板阵列变量分解成为独立变量
+            extract($viewParamData, EXTR_OVERWRITE);
         }
 
         if (!$peg) {
             if (!$viewPath) {
-                $path = VIEW_PATH . DS . MODULE . DS . parseName(CONTROLLER, false) . DS . ACTION . '.html';
+                $path = VIEW_PATH . DS . str_replace('.', DS, MODULE) . DS . parseName(CONTROLLER, false) . DS . ACTION . '.html';
             }
             //绝对路径
             elseif (stripos($viewPath, '/') === 0) {
@@ -56,13 +64,13 @@ class Controller
             }
             //相对路径
             else {
-                $path = VIEW_PATH . DS . MODULE . DS . $viewPath . '.html';
+                $path = VIEW_PATH . DS . str_replace('.', DS, MODULE) . DS . $viewPath . '.html';
             }
         } else {
             $path = $viewPath;
         }
 
-        $path = str_replace('\\', DS, $path);
+        $path = ltrim(str_replace('\\', DS, $path), DS);
 
         if (!is_file($path)) {
             throw new Exception('视图地址' . $path . '不存在');
@@ -84,14 +92,15 @@ class Controller
         $content = ob_get_clean();
 
         //标签翻译功能
-        if (Start::$config['tag_trans']) {
+        if (config('tag_trans')) {
             $content = $this->tagTrans($content);
         }
 
         echo $content;
 
         //模块debug功能
-        if (Start::$config['trace'] && $trace) {
+        if (config('trace') && $trace) {
+
             Trace::run();
         }
     }
