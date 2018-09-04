@@ -7,7 +7,7 @@ class HttpTrace
     {
         header('http/1.1 ' . $code);
         header('status: ' . $code);
-        if (config('trace')) {
+        if (config('debug')) {
             $e['message'] = '<p style="font-size:20px">-.-----..-.-.-.....-... : ' . $msg . '</p>';
             return include FARM_PATH . DS . 'trace' . DS . 'error.html';
         } else {

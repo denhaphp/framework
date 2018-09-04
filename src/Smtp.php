@@ -41,7 +41,7 @@ class Smtp
 
     }
 
-    public function smtp($relay_host = '', $smtp_port = 25, $auth = false, $user, $pass)
+    protected function smtp($relay_host = '', $smtp_port = 25, $auth = false, $user, $pass)
     {
         $this->debug      = false;
         $this->smtp_port  = $smtp_port;
@@ -58,7 +58,7 @@ class Smtp
     }
 
     /** debug测试 */
-    public function testDebug()
+    protected function testDebug()
     {
 
         $this->debug      = true;
@@ -90,7 +90,7 @@ class Smtp
      * @param  string                   $additional_headers [邮件格式（HTML/TXT）,TXT为文本邮件]
      * @return [type]                                       [description]
      */
-    public function sendmail($to, $subject = '', $body = '', $mailtype = 'HTML', $cc = '', $bcc = '', $additional_headers = '')
+    protected function sendmail($to, $subject = '', $body = '', $mailtype = 'HTML', $cc = '', $bcc = '', $additional_headers = '')
     {
 
         //获取发件邮箱名称

@@ -37,6 +37,9 @@ class Trace
                 case 'SQL':
                     $trace[$title] = self::$sqlInfo;
                     break;
+                case 'DEBUG':
+                    $trace[$title] = self::baseInfo();
+                    break;
                 default:
                     $trace[$title] = $name;
                     break;
@@ -79,7 +82,7 @@ class Trace
 
             $debugContent = self::getFileContent($e['file'], $e['line']);
 
-            if (config('trace')) {
+            if (config('debug')) {
                 return include FARM_PATH . DS . 'trace' . DS . 'error.html';
             } else {
                 //FATAL ERROR 发送到邮箱
@@ -125,7 +128,6 @@ class Trace
         if (config('trace')) {
             return include FARM_PATH . DS . 'trace' . DS . 'error.html';
         } else {
-
             header("http/1.1 404 not found");
             header("status: 404 not found");
             return include FARM_PATH . DS . 'trace' . DS . '404.html';
@@ -190,19 +192,25 @@ class Trace
     private static function baseInfo()
     {
 
-        $config = config();
-        $base   = array(
+        $dbConfig = config('dbConfig', 'db');
+        $dbName   = '';
+        foreach ($dbConfig as $key => $value) {
+            !isset($value['host']) ?: $dbName .= $value['host'] . ' : ';
+            !isset($value['name']) ?: $dbName .= $value['name'] . '  / ';
+        }
+
+        $base = [
             '请求信息' => date('Y-m-d H:i:s', $_SERVER['REQUEST_TIME']) . ' ' . $_SERVER['SERVER_PROTOCOL'] . ' ' . $_SERVER['REQUEST_METHOD'] . ' : ' . strip_tags($_SERVER['REQUEST_URI']),
-            '运行时间' => (microtime(true)) - $GLOBALS['_beginTime'] . ' s',
-            '吞吐率'    => number_format(1 / $GLOBALS['_beginTime'], 2) . 'req/s',
-            '内存开销' => MEMORY_LIMIT_ON ? number_format((memory_get_usage() - $GLOBALS['_startUseMems']) / 1024, 2) . ' kb' : '不支持',
+            '运行时间' => number_format(microtime(true) - START_TIME, 6) . ' s',
+            '吞吐率'    => number_format(1 / (microtime(true) - START_TIME), 2) . 'req/s',
+            '内存开销' => number_format((memory_get_usage() - START_USE_MENUS) / 1024, 2) . ' kb',
             '文件加载' => count(get_included_files()),
             //'缓存信息' => n('cache_read') . ' gets ' . n('cache_write') . ' writes ',
-            //'配置加载' => count(c()),
+            '配置加载' => count(config()),
             '会话信息' => 'SESSION_ID=' . session_id(),
-            '数据库'    => $config['db_config'][0]['db_name'],
-            '磁盘信息' => number_format($GLOBALS['_diskTotalSpace'] / 1024 / 1024 / 1024, 3) . ' G (all) / ' . number_format(($GLOBALS['_diskTotalSpace'] - $GLOBALS['_diskFreeSpace']) / 1024 / 1024 / 1024, 3) . ' G (use) / ' . number_format($GLOBALS['_diskFreeSpace'] / 1024 / 1024 / 1024, 3) . 'G (free)',
-        );
+            '数据库'    => $dbName,
+            '磁盘信息' => number_format(DISK_TOTAL_SPACE / 1024 / 1024 / 1024, 3) . ' G (all) / ' . number_format((DISK_TOTAL_SPACE - DISK_FREE_SPACE) / 1024 / 1024 / 1024, 3) . ' G (use) / ' . number_format(DISK_FREE_SPACE / 1024 / 1024 / 1024, 3) . 'G (free)',
+        ];
 
         return $base;
     }
@@ -219,11 +227,4 @@ class Trace
         return $info;
     }
 
-    //获取执行时间
-    private static function showTime()
-    {
-        /* useup('beginTime', $GLOBALS['_beginTime']);
-    useup('viewEndTime');
-    return useup('beginTime', 'viewEndTime') . 's ( Load:' . useup('beginTime', 'loadTime') . 's Init:' . useup('loadTime', 'initTime') . 's Exec:' . useup('initTime', 'viewStartTime') . 's Template:' . useup('viewStartTime', 'viewEndTime') . 's )';*/
-    }
 }

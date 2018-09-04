@@ -6,14 +6,21 @@ class Route
     public static $path;
     public static $class;
     public static $uri;
-    public static $rule;
+    public static $rule   = [];
+    public static $config = []; // 配置信息
 
     //执行主体
     public static function main($route = 'mca')
     {
-        self::$uri = self::parseUri();
+        self::$config = config('route');
+        self::$uri    = self::parseUri();
         // 检查规则路由
-        self::$uri = dao('RouteRule')->getRouteUrl('/' . self::$uri);
+        if (self::$config['open_route']) {
+
+            include_once CONFIG_PATH . 'route.php';
+
+            self::$uri = self::getRouteUrl('/' . self::$uri);
+        }
 
         //转换Url参数为GET参数
         $uriArr = explode('/s/', self::$uri);
@@ -24,8 +31,8 @@ class Route
         $routeArr = explode('/', ltrim(reset($uriArr), '/'));
 
         // 开启指定结构层数
-        if (config('open_uri_level')) {
-            $routeArr = array_values(array_slice($baseUriArr, 0, config('base_uri_level')));
+        if (self::$config['open_level']) {
+            $routeArr = array_values(array_slice($baseUriArr, 0, self::$config['level']));
         }
 
         define('MODULE', implode('.', array_slice($routeArr, 0, -2)));
@@ -36,6 +43,90 @@ class Route
 
         return self::$class = implode('\\', $class);
 
+    }
+
+    /**
+     * 保存路由规则
+     * @date   2018-07-13T09:32:01+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $url       [description]
+     * @param  string                   $changeUrl [description]
+     * @param  array                    $options   [description]
+     * @return [type]                              [description]
+     */
+    public static function rule($url, $changeUrl = '/', $options = [])
+    {
+        self::$rule[] = [
+            'url'        => $url,
+            'change_url' => $changeUrl,
+            'params'     => isset($options['params']) ? $options['params'] : '',
+            'jump'       => isset($options['jump']) ? $options['jump'] : false,
+        ];
+    }
+
+    public static function parseRouteUri($uri)
+    {
+        $uriArr = explode('/s/', $uri);
+
+        if (isset($uriArr[1])) {
+            $params    = $uriArr[1];
+            $changeUrl = $uriArr[0];
+        } else {
+            $params    = '';
+            $changeUrl = $uri;
+        }
+
+        $changeUrl = '/' . ltrim(trim($changeUrl), '/');
+
+        return [$changeUrl, $params];
+    }
+
+    /** 获取实际路径 */
+    public static function getRouteUrl($uri)
+    {
+
+        list($changeUrl, $params) = self::parseRouteUri($uri);
+
+        $isJump = false; //是否自动跳转
+
+        foreach (self::$rule as $rule) {
+            if ($rule['change_url'] == $changeUrl && $rule['params'] && $rule['params'] == $params) {
+                self::changeGetValue($rule['params']);
+                $url    = $rule['url'];
+                $isJump = $rule['jump'];
+                break;
+            } elseif ($rule['change_url'] == $changeUrl) {
+                $url    = $rule['url'] . ($params ? '/s/' . $params : '');
+                $isJump = $rule['jump'];
+                break;
+            }
+        }
+
+        //自动跳转Url
+        if ($isJump) {
+            die(header('Location:' . $url));
+        }
+
+        return isset($url) ? $url : $uri;
+    }
+
+    public static function getRouteChangeUrl($uri, $params = '')
+    {
+
+        list($changeUrl, $params) = self::parseRouteUri($uri);
+
+        foreach (self::$rule as $rule) {
+            if ($rule['url'] == $changeUrl && $rule['params'] && $rule['params'] == $params) {
+                self::changeGetValue($rule['params']);
+                $url = $rule['change_url'];
+                break;
+            } elseif ($rule['url'] == $changeUrl) {
+                $url = $rule['change_url'] . ($params ? '/s/' . $params : '');
+                break;
+            }
+        }
+
+        return isset($url) ? $url : $uri;
     }
 
     //获取直接参数
@@ -94,9 +185,13 @@ class Route
         for ($i = 0; $i < $total;) {
             if (isset($paramArray[$i + 1])) {
                 $_GET[$paramArray[$i]] = urldecode($paramArray[$i + 1]);
+
+                $result[$paramArray[$i]] = urldecode($paramArray[$i + 1]);
             }
             $i += 2;
         }
+
+        return $result;
 
     }
 

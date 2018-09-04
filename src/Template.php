@@ -40,6 +40,15 @@ class Template
         $this->content = preg_replace('/' . $this->left . 'elseif(.*?)' . $this->right . '/is', '<?php }elseif(\1){ ?>', $this->content);
         //替换{/if}
         $this->content = preg_replace('/' . $this->left . '\/if' . $this->right . '/is', '<?php } ?>', $this->content);
+
+        // 替换配置字符串
+        $replaceStr = config('view_replace_str');
+        foreach ($replaceStr as $key => $value) {
+            if (strpos($this->content, $key) !== false) {
+                $this->content = str_replace($key, $value, $this->content);
+            }
+        }
+
         $this->saveFile();
 
     }

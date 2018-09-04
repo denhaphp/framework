@@ -1,93 +1,105 @@
 <?php
 //------------------------
-// 验证码类
+// 图形验证码类
 //-------------------------
 namespace denha;
 
-class ValidateCode
+class Captcha
 {
-    private $charset = 'abcdefghkmnprstuvwxyzABCDEFGHKMNPRSTUVWXYZ23456789'; //随机因子
-    private $code; //验证码
-    private $codelen = 4; //验证码长度
-    private $width   = 130; //宽度
-    private $height  = 50; //高度
-    private $img; //图形资源句柄
-    private $font; //指定的字体
-    private $fontsize = 20; //指定字体大小
-    private $fontcolor; //指定字体颜色
-
-    //构造方法初始化
-    public function __construct()
-    {
-        $this->font = dirname(__FILE__) . '/font/elephant.ttf'; //注意字体路径要写对，否则显示不了图片
-        $this->doimg();
-    }
+    private static $charset = 'abcdefghkmnprstuvwxyzABCDEFGHKMNPRSTUVWXYZ23456789'; //随机因子
+    private static $code; //验证码
+    private static $codelen = 4; //验证码长度
+    private static $width   = 130; //宽度
+    private static $height  = 50; //高度
+    private static $img; //图形资源句柄
+    private static $font; //指定的字体
+    private static $fontsize = 20; //指定字体大小
+    private static $fontcolor; //指定字体颜色
 
     //生成随机码
-    private function createCode()
+    private static function createCode()
     {
-        $_len = strlen($this->charset) - 1;
-        for ($i = 0; $i < $this->codelen; $i++) {
-            $this->code .= $this->charset[mt_rand(0, $_len)];
+        $_len = strlen(self::$charset) - 1;
+        for ($i = 0; $i < self::$codelen; $i++) {
+            self::$code .= self::$charset[mt_rand(0, $_len)];
         }
+
+        session('captchaCode', strtolower(self::$code));
     }
 
     //生成背景
-    private function createBg()
+    private static function createBg()
     {
-        $this->img = imagecreatetruecolor($this->width, $this->height);
-        $color     = imagecolorallocate($this->img, mt_rand(157, 255), mt_rand(157, 255), mt_rand(157, 255));
-        imagefilledrectangle($this->img, 0, $this->height, $this->width, 0, $color);
+        self::$img = imagecreatetruecolor(self::$width, self::$height);
+        $color     = imagecolorallocate(self::$img, mt_rand(157, 255), mt_rand(157, 255), mt_rand(157, 255));
+        imagefilledrectangle(self::$img, 0, self::$height, self::$width, 0, $color);
     }
 
     //生成文字
-    private function createFont()
+    private static function createFont()
     {
-        $_x = $this->width / $this->codelen;
-        for ($i = 0; $i < $this->codelen; $i++) {
-            $this->fontcolor = imagecolorallocate($this->img, mt_rand(0, 156), mt_rand(0, 156), mt_rand(0, 156));
-            imagettftext($this->img, $this->fontsize, mt_rand(-30, 30), $_x * $i + mt_rand(1, 5), $this->height / 1.4, $this->fontcolor, $this->font, $this->code[$i]);
+        $_x = self::$width / self::$codelen;
+        for ($i = 0; $i < self::$codelen; $i++) {
+            self::$fontcolor = imagecolorallocate(self::$img, mt_rand(0, 156), mt_rand(0, 156), mt_rand(0, 156));
+            imagettftext(self::$img, self::$fontsize, mt_rand(-30, 30), $_x * $i + mt_rand(1, 5), self::$height / 1.4, self::$fontcolor, self::$font, self::$code[$i]);
         }
     }
 
     //生成线条、雪花
-    private function createLine()
+    private static function createLine()
     {
         //线条
         for ($i = 0; $i < 6; $i++) {
-            $color = imagecolorallocate($this->img, mt_rand(0, 156), mt_rand(0, 156), mt_rand(0, 156));
-            imageline($this->img, mt_rand(0, $this->width), mt_rand(0, $this->height), mt_rand(0, $this->width), mt_rand(0, $this->height), $color);
+            $color = imagecolorallocate(self::$img, mt_rand(0, 156), mt_rand(0, 156), mt_rand(0, 156));
+            imageline(self::$img, mt_rand(0, self::$width), mt_rand(0, self::$height), mt_rand(0, self::$width), mt_rand(0, self::$height), $color);
         }
         //雪花
         for ($i = 0; $i < 100; $i++) {
-            $color = imagecolorallocate($this->img, mt_rand(200, 255), mt_rand(200, 255), mt_rand(200, 255));
-            imagestring($this->img, mt_rand(1, 5), mt_rand(0, $this->width), mt_rand(0, $this->height), '*', $color);
+            $color = imagecolorallocate(self::$img, mt_rand(200, 255), mt_rand(200, 255), mt_rand(200, 255));
+            imagestring(self::$img, mt_rand(1, 5), mt_rand(0, self::$width), mt_rand(0, self::$height), '*', $color);
         }
     }
 
     //输出
-    private function outPut()
+    private static function outPut()
     {
         ob_clean();
         header('Content-type:image/png');
-        imagepng($this->img);
-        imagedestroy($this->img);
+        imagepng(self::$img);
+        imagedestroy(self::$img);
         die;
     }
 
     //对外生成
-    public function doimg()
+    public static function doimg()
     {
-        $this->createBg();
-        $this->createCode();
-        $this->createLine();
-        $this->createFont();
-        $this->outPut();
+        self::$font = dirname(__FILE__) . '/font/elephant.ttf'; //注意字体路径要写对，否则显示不了图片
+        self::createBg();
+        self::createCode();
+        self::createLine();
+        self::createFont();
+        self::outPut();
+    }
+
+    // 验证
+    public static function check($code)
+    {
+        $code = trim(strtolower($code));
+
+        if (!$code) {
+            return false;
+        } elseif (!self::getCode()) {
+            return false;
+        } elseif ($code != self::getCode()) {
+            return false;
+        }
+
+        return true;
     }
 
     //获取验证码
-    public function getCode()
+    public static function getCode()
     {
-        return strtolower($this->code);
+        return session('captchaCode') ? session('captchaCode') : strtolower(self::$code);
     }
 }

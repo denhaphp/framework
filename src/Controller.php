@@ -56,34 +56,32 @@ class Controller
 
         if (!$peg) {
             if (!$viewPath) {
-                $path = VIEW_PATH . DS . str_replace('.', DS, MODULE) . DS . parseName(CONTROLLER, false) . DS . ACTION . '.html';
+                $path = VIEW_PATH . str_replace('.', DS, MODULE) . DS . parseName(CONTROLLER, false) . DS . ACTION . '.html';
             }
             //绝对路径
             elseif (stripos($viewPath, '/') === 0) {
-                $path = VIEW_PATH . DS . substr($viewPath, 1) . '.html';
+                $path = VIEW_PATH . substr($viewPath, 1) . '.html';
             }
             //相对路径
             else {
-                $path = VIEW_PATH . DS . str_replace('.', DS, MODULE) . DS . $viewPath . '.html';
+                $path = VIEW_PATH . str_replace('.', DS, MODULE) . DS . $viewPath . '.html';
             }
         } else {
             $path = $viewPath;
         }
 
-        $path = ltrim(str_replace('\\', DS, $path), DS);
-
         if (!is_file($path)) {
-            throw new Exception('视图地址' . $path . '不存在');
+            throw new Exception('视图地址:' . $path . '不存在 ');
         }
 
         $cachePath = DATA_PATH . md5($path) . '.php';
 
         ob_start();
-        //开启页面缓存
-        if (is_file($cachePath) && filemtime($path) == filemtime($cachePath) && !Start::$config['trace']) {
+        // 开启页面缓存
+        if (is_file($cachePath) && filemtime($path) == filemtime($cachePath) && !config('debug')) {
             include $cachePath;
         } else {
-            //处理视图模板
+            // 处理视图模板
             $template = new Template($path);
             $template->getContent();
             include $template->loadPath;
@@ -91,14 +89,14 @@ class Controller
 
         $content = ob_get_clean();
 
-        //标签翻译功能
+        // 标签翻译功能
         if (config('tag_trans')) {
             $content = $this->tagTrans($content);
         }
 
         echo $content;
 
-        //模块debug功能
+        // 模块debug功能
         if (config('trace') && $trace) {
 
             Trace::run();

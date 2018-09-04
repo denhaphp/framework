@@ -76,12 +76,6 @@ class Start
         GSF($_POST, $argsArr);
         GSF($_COOKIE, $argsArr);
 
-        if (MAGIC_QUOTES_GPC) {
-            $_GET     = array_map('GSS', $_GET);
-            $_POST    = array_map('GSS', $_POST);
-            $_COOKIE  = array_map('GSS', $_COOKIE);
-            $_REQUEST = array_map('GSS', $_REQUEST);
-        }
     }
 
     //检测磁盘容量
@@ -89,11 +83,10 @@ class Start
     {
         if (self::$config['check_disk']) {
 
-            $free = number_format($GLOBALS['_diskFreeSpace'] / 1024 / 1024 / 1024, 2);
+            $free = number_format(DISK_TOTAL_SPACE / 1024 / 1024 / 1024, 2);
             if (self::$config['disk_space'] >= $free) {
-                $title = $_SERVER['HTTP_HOST'] . ' 磁盘容量不足' . self::$config['disk_space'] . 'G ip:' . getIP() . ' ' . $_SERVER['SERVER_PROTOCOL'];
+                $title = URL . ' 磁盘容量不足' . self::$config['disk_space'] . 'G ip:' . getIP() . ' ' . $_SERVER['SERVER_PROTOCOL'];
                 dao('Mail')->send(config('send_mail'), $title, $title, array('save_log' => false));
-
             }
         }
     }

@@ -20,7 +20,7 @@ class Pages
         $this->showPageFigure = $showPageFigure ? $showPageFigure : $this->showPageFigure;
     }
 
-    public function pages()
+    protected function pages()
     {
         if ($this->total == 0) {
             return false;
