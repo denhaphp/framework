@@ -60,8 +60,10 @@ class Template
             return false;
         }
 
+        is_dir(DATA_TPL_PATH) ? '' : mkdir(DATA_TPL_PATH, 0755, true);
+
         $cacheMd5       = md5($this->viewPath);
-        $this->loadPath = DATA_PATH . $cacheMd5 . '.php';
+        $this->loadPath = DATA_TPL_PATH . $cacheMd5 . '.php';
         $file           = fopen($this->loadPath, 'w');
         fwrite($file, $this->content);
         fclose($file);
@@ -96,6 +98,8 @@ class Template
                     $content = fread($file, filesize($path));
                     //替换模板变量
                     $this->content = str_replace($matches[0][$key], $content, $this->content);
+                    // 循环模板
+                    $this->stampInclude();
                 } else {
 
                 }

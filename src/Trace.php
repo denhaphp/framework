@@ -112,7 +112,7 @@ class Trace
 
         if ($error->getTrace()) {
             foreach ($error->getTrace() as $key => $value) {
-                $e['trace'] .= ($key + 1) . ' File :' . $value['file'];
+                $e['trace'] .= ($key + 1) . ' File :' . (!empty($value['file']) ? $value['file'] : '未知地址');
                 if (isset($value['class'])) {
                     $e['trace'] .= ' From Class :' . $value['class'];
                 }
@@ -121,7 +121,7 @@ class Trace
                     $e['trace'] .= ' In Function :' . $value['function'];
                 }
 
-                $e['trace'] .= ' on line ' . $value['line'] . PHP_EOL;
+                $e['trace'] .= ' on line ' . (!empty($value['line']) ? $value['line'] : '未知行数') . PHP_EOL;
             }
         }
 

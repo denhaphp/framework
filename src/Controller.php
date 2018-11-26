@@ -74,7 +74,7 @@ class Controller
             throw new Exception('视图地址:' . $path . '不存在 ');
         }
 
-        $cachePath = DATA_PATH . md5($path) . '.php';
+        $cachePath = DATA_TPL_PATH . md5($path) . '.php';
 
         ob_start();
         // 开启页面缓存
@@ -98,7 +98,6 @@ class Controller
 
         // 模块debug功能
         if (config('trace') && $trace) {
-
             Trace::run();
         }
     }

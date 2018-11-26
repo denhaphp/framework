@@ -8,12 +8,18 @@ class Route
     public static $uri;
     public static $rule   = [];
     public static $config = []; // 配置信息
+    // 当前路由信息
+    public static $thisRule = [
+        'uri'  => '', // 原生地址
+        'rule' => [], // 改写路由信息
+    ];
 
     //执行主体
     public static function main($route = 'mca')
     {
-        self::$config = config('route');
-        self::$uri    = self::parseUri();
+        self::$config          = config('route');
+        self::$thisRule['uri'] = self::$uri = self::parseUri();
+
         // 检查规则路由
         if (self::$config['open_route']) {
 
@@ -57,13 +63,16 @@ class Route
     public static function rule($url, $changeUrl = '/', $options = [])
     {
         self::$rule[] = [
-            'url'        => $url,
-            'change_url' => $changeUrl,
-            'params'     => isset($options['params']) ? $options['params'] : '',
-            'jump'       => isset($options['jump']) ? $options['jump'] : false,
+            'url'          => $url,
+            'change_url'   => $changeUrl,
+            'params'       => isset($options['params']) ? $options['params'] : '',
+            'suffix'       => isset($options['suffix']) ? $options['suffix'] : '/',
+            'limit_suffix' => isset($options['limit_suffix']) ? explode(',', $options['limit_suffix']) : '',
+            'jump'         => isset($options['jump']) ? $options['jump'] : false,
         ];
     }
 
+    // 解析请求URL
     public static function parseRouteUri($uri)
     {
         $uriArr = explode('/s/', $uri);
@@ -87,18 +96,39 @@ class Route
 
         list($changeUrl, $params) = self::parseRouteUri($uri);
 
+        // 获取后缀
+        $suffix = pathinfo($changeUrl, PATHINFO_EXTENSION);
+        if ($suffix) {
+            // 删除后缀
+            $changeUrl = str_replace('.' . $suffix, '', $changeUrl);
+        }
+
         $isJump = false; //是否自动跳转
 
+        // 原始地址+参数匹配 有限
         foreach (self::$rule as $rule) {
             if ($rule['change_url'] == $changeUrl && $rule['params'] && $rule['params'] == $params) {
-                self::changeGetValue($rule['params']);
                 $url    = $rule['url'];
                 $isJump = $rule['jump'];
+
+                self::$thisRule['rule'] = $rule; // 保存改写路由信息
+                self::changeGetValue($rule['params']); // 保存GET参数
                 break;
-            } elseif ($rule['change_url'] == $changeUrl) {
-                $url    = $rule['url'] . ($params ? '/s/' . $params : '');
-                $isJump = $rule['jump'];
-                break;
+            }
+
+        }
+
+        // 改写地址匹配
+        if (!self::$thisRule['rule']) {
+            foreach (self::$rule as $rule) {
+                if ($rule['change_url'] == $changeUrl) {
+                    $url    = $rule['url'] . ($params ? '/s/' . $params : '');
+                    $isJump = $rule['jump'];
+
+                    self::$thisRule['rule'] = $rule; // 保存改写路由信息
+                    self::changeGetValue($rule['params']); // 保存GET参数
+                    break;
+                }
             }
         }
 
@@ -110,23 +140,43 @@ class Route
         return isset($url) ? $url : $uri;
     }
 
+    // 获取转换的路由地址
     public static function getRouteChangeUrl($uri, $params = '')
     {
 
         list($changeUrl, $params) = self::parseRouteUri($uri);
 
+        // 判断匹配路由
         foreach (self::$rule as $rule) {
             if ($rule['url'] == $changeUrl && $rule['params'] && $rule['params'] == $params) {
-                self::changeGetValue($rule['params']);
-                $url = $rule['change_url'];
-                break;
-            } elseif ($rule['url'] == $changeUrl) {
-                $url = $rule['change_url'] . ($params ? '/s/' . $params : '');
+                self::changeGetValue($rule['params']); // 保存GET信息
+                if ($rule['change_url']) {
+                    $url = $rule['change_url'] . $rule['suffix'];
+                } else {
+                    $url = $rule['change_url'];
+                }
+
                 break;
             }
         }
 
+        if (!isset($url)) {
+            foreach (self::$rule as $rule) {
+                if ($rule['url'] == $changeUrl) {
+                    // 增加自带参数 过来 多"/"情况
+                    $url = '/' . ltrim(($rule['change_url'] . ($params ? '/s/' . $params : '') . $rule['suffix']), '/');
+                    break;
+                }
+            }
+        }
+
         return isset($url) ? $url : $uri;
+    }
+
+    // 获取当前路由信息
+    public static function getRule()
+    {
+        return self::$thisRule;
     }
 
     //获取直接参数
@@ -142,20 +192,18 @@ class Route
         //去除urldecode转码 转码会导致get参数 带/解析错误
         // $uri = urldecode($_SERVER['REQUEST_URI']);
         $uri = $_SERVER['REQUEST_URI'];
-
         if (strpos($uri, $_SERVER['SCRIPT_NAME']) === 0) {
             $uri = substr($uri, strlen($_SERVER['SCRIPT_NAME']));
         }
 
-        //拆分数组
+        // 删除"/"
         $uri = trim($uri, '/');
-
         if (!$uri) {
             return false;
         }
 
+        // 删除参数
         $pos = strpos($uri, '?');
-
         if ($pos !== false) {
             $uri = substr($uri, 0, $pos);
         }
@@ -176,6 +224,10 @@ class Route
      */
     public static function changeGetValue($uri)
     {
+        if (!$uri) {
+            return false;
+        }
+
         //转换参数
 
         $paramArray = array_values(explode('/', $uri));

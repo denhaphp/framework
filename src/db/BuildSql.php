@@ -192,7 +192,18 @@ class BuildSql
      */
     private function addFieldTag($field)
     {
-        if (strripos($field, '`') === false && $field != '_string' && strripos($field, '*') === false && strripos($field, 'concat') === false) {
+        if (
+            strripos($field, '`') === false
+            && $field != '_string'
+            && strripos($field, '*') === false
+            && strripos($field, 'concat') === false
+            && strripos($field, 'sum') === false
+            && strripos($field, 'SUM') === false
+            && strripos($field, 'AVG') === false
+            && strripos($field, 'avg') === false
+            && strripos($field, 'as') === false
+            && strripos($field, 'AS') === false
+        ) {
             $field = strripos($field, '.') !== false ? str_replace('.', '.`', $field) . '`' : '`' . $field . '`';
         }
 
@@ -211,17 +222,9 @@ class BuildSql
     public function where($where, $value = null, $exp = null)
     {
 
-        $expRule[0] = ['>', '<', '>=', '<=', '!=', 'like', '<>'];
-        $expRule[1] = ['in', 'not in', 'IN', 'NOT IN'];
-        $expRule[2] = ['instr', 'INSTR'];
-        $expRule[3] = ['between', 'BETWEEN'];
-        $expRule[4] = ['or', 'OR'];
-
         if (!$where) {
             return $this;
         }
-
-        $newWhere = '';
 
         if ($value !== null && $exp !== null) {
             $map[$where] = [$value, $exp];
@@ -234,57 +237,134 @@ class BuildSql
         if (is_array($where)) {
             foreach ($where as $mapField => $v) {
 
-                //记录条件参数
-                $this->options['map'][] = [$mapField => $v];
-
+                // 格式化字段
                 $mapField = $this->addFieldTag($mapField);
 
                 if (is_array($v)) {
-
                     list($mapExp, $mapValue) = $v;
-
-                    if (in_array($mapExp, $expRule[0])) {
-                        $newWhere .= $mapField . '  ' . $mapExp . ' \'' . $mapValue . '\' AND ';
-                    } elseif (in_array($mapExp, $expRule[1])) {
-                        if (!$mapValue) {
-                            $newWhere .= $mapField . '  ' . $mapExp . ' (\'\') AND ';
-                        } else {
-                            if (!is_array($mapValue) && stripos($mapValue, ',') !== false) {
-                                $mapValue = explode(',', $mapValue);
-                            }
-                            $mapValue      = is_array($mapValue) ? $mapValue : (array) $mapValue;
-                            $commonInValue = '';
-                            foreach ($mapValue as $inValue) {
-                                $commonInValue .= '\'' . $inValue . '\',';
-                            }
-                            $commonInValue = substr($commonInValue, 0, -1);
-                            $newWhere .= $mapField . '  ' . $mapExp . ' (' . $commonInValue . ') AND ';
-                        }
-                    } elseif (in_array($mapExp, $expRule[2])) {
-                        $newWhere .= $mapExp . '(' . $mapField . ',\'' . $mapValue . '\') AND ';
-                    } elseif (in_array($mapExp, $expRule[3])) {
-                        $newWhere .= $mapField . '  ' . $mapExp . ' \'' . $mapValue . '\' AND \'' . $v[2] . '\' AND ';
-                    } elseif (in_array($mapExp, $expRule[4])) {
-                        $newWhere .= $mapField . ' = \'' . $mapValue . '\' OR ';
-                    }
                 } elseif ($mapField == '_string') {
-                    $newWhere .= $v . ' AND ';
+                    $mapExp   = '_string';
+                    $mapValue = $v;
                 } else {
-                    $newWhere .= $mapField . ' = \'' . $v . '\' AND ';
+                    $mapExp   = '=';
+                    $mapValue = $v;
                 }
+
+                // 解析map
+                $this->options['map'][] = $whereMap[] = $this->parseMap($mapField, $mapExp, $mapValue);
             }
+
+            $newWhere = $this->parseWhere($whereMap);
+
         } else {
             //记录条件参数
             $this->options['map'][] = $where;
         }
 
         if (!isset($this->bulid['where'])) {
-            $this->bulid['where'] = ' WHERE ' . substr($newWhere, 0, -4);
+            $this->bulid['where'] = ' WHERE ' . substr($newWhere, 5);
         } else {
-            $this->bulid['where'] .= ' AND ' . substr($newWhere, 0, -4);
+            $this->bulid['where'] .= $newWhere;
         }
 
         return $this;
+    }
+
+    public function parseWhere($whereMap)
+    {
+        if (count($whereMap) > 1) {
+            // 第一个OR出现
+            $orStart = true;
+            foreach ($whereMap as $kk => $vv) {
+                if (trim($vv[1]) == 'OR' && $orStart) {
+                    $orStart = false;
+                    // 存在上一条信息 则上一条增加一个 "("
+                    if ($kk > 0) {
+                        $whereMap[($kk - 1)][1] = $whereMap[($kk - 1)][1] . ' ( ';
+                    }
+                    // 否则当前信息增加一个 "("
+                    else {
+                        $whereMap[$kk][1] = $whereMap[$kk][1] . ' ( ';
+                    }
+                }
+
+                // 最后一个OR出现
+                if (trim($vv[1]) == 'AND' && !$orStart) {
+                    $orStart          = true;
+                    $whereMap[$kk][0] = $whereMap[$kk][0] . ' ) ';
+                }
+                // 最后一条数据
+                elseif (!$orStart && count($whereMap) == ($kk + 1)) {
+                    $orStart          = true;
+                    $whereMap[$kk][0] = $whereMap[$kk][0] . ' ) ';
+                }
+
+            }
+        }
+
+        $map = '';
+        foreach ($whereMap as $vv) {
+            $map .= $vv[1] . $vv[0];
+        }
+
+        return $map;
+    }
+
+    public function parseMap($mapField, $mapExp, $mapValue, $mapLink = 'AND')
+    {
+        $mapLink = ' ' . $mapLink . ' '; // 连接符
+        $expRule = [
+            ['>', '<', '>=', '<=', '!=', 'like', '<>', '='],
+            ['in', 'not in', 'IN', 'NOT IN'],
+            ['instr', 'INSTR'],
+            ['between', 'BETWEEN'],
+            ['or', 'OR'],
+            ['_string', '_STRING'],
+        ];
+
+        // '>', '<', '>=', '<=', '!=', 'like', '<>'
+        if (in_array($mapExp, $expRule[0])) {
+            $map = $mapField . '  ' . $mapExp . ' \'' . $mapValue . '\'';
+        }
+        // 'in', 'not in', 'IN', 'NOT IN'
+        elseif (in_array($mapExp, $expRule[1])) {
+            if (!$mapValue) {
+                $map = $mapField . '  ' . $mapExp . ' (\'\')';
+            } else {
+                if (!is_array($mapValue) && stripos($mapValue, ',') !== false) {
+                    $mapValue = explode(',', $mapValue);
+                }
+                $mapValue      = is_array($mapValue) ? $mapValue : (array) $mapValue;
+                $commonInValue = '';
+                foreach ($mapValue as $inValue) {
+                    $commonInValue .= '\'' . $inValue . '\',';
+                }
+                $commonInValue = substr($commonInValue, 0, -1);
+                $map           = $mapField . '  ' . $mapExp . ' (' . $commonInValue . ')';
+            }
+        }
+        // 'instr', 'INSTR'
+        elseif (in_array($mapExp, $expRule[2])) {
+            $map = $mapExp . '(' . $mapField . ',\'' . $mapValue . '\')';
+        }
+        // 'between', 'BETWEEN'
+        elseif (in_array($mapExp, $expRule[3])) {
+            $map = $mapField . '  ' . $mapExp . ' \'' . $mapValue[0] . '\' AND \'' . $mapValue[1] . '\'';
+        }
+        // 'or', 'OR'
+        elseif (in_array($mapExp, $expRule[4])) {
+            if (count((array) $mapValue) == 2) {
+                return $this->parseMap($mapField, $mapValue[0], $mapValue[1], strtoupper($mapExp));
+            } else {
+                $mapLink = ' ' . strtoupper($mapExp) . ' '; // 连接符
+                $map     = $mapField . ' = \'' . $mapValue . '\'';
+            }
+        }
+        // '_string', '_STRING'
+        elseif (in_array($mapExp, $expRule[5])) {
+            $map = $mapValue;
+        }
+        return [$map, $mapLink];
     }
 
     /**
@@ -573,9 +653,13 @@ class BuildSql
         $this->bulidSql('SELECT');
 
         $result = $this->query();
-        $data   = $result->fetchColumn();
 
-        return $data;
+        if ($result) {
+            $data = $result->fetchColumn();
+        }
+
+        return !empty($data) ? $data : '';
+
     }
 
     /**
@@ -644,9 +728,13 @@ class BuildSql
         $result = $this->query();
 
         $data = $result->fetch(PDO::FETCH_NUM);
+        if ($data == false) {
+            foreach ($this->options['field'] as $value) {
+                $data[$value] = '';
+            }
+        }
 
         return $data;
-
     }
 
     /**
@@ -799,7 +887,7 @@ class BuildSql
     {
         //如果没有写入权限尝试修改权限 如果修改后还是失败 则跳过
         if (isWritable(DATA_PATH)) {
-            $path = DATA_PATH . 'sql_log' . DS . $this->options['database'] . DS;
+            $path = DATA_SQL_PATH . $this->options['database'] . DS;
             is_dir($path) ? '' : mkdir($path, 0755, true);
 
             $path .= 'error_' . date('Y_m_d_H', TIME) . '.text';
@@ -831,7 +919,7 @@ class BuildSql
         }
 
         //创建文件夹
-        is_dir(DATA_PATH . 'sql_log') ? '' : mkdir(DATA_PATH . 'sql_log', 0755, true);
+        is_dir(DATA_SQL_PATH) ? '' : mkdir(DATA_SQL_PATH, 0755, true);
 
         $info = '------ ' . $this->sqlInfo['time'];
         $info .= ' | ' . date('Y-m-d H:i:s', TIME);
@@ -841,7 +929,7 @@ class BuildSql
 
         //记录sql
         if ($this->sqlInfo && self::$dbConfig[$this->id]['save_log']) {
-            $path = DATA_PATH . 'sql_log' . DS . $this->options['database'] . DS;
+            $path = DATA_SQL_PATH . $this->options['database'] . DS;
             is_dir($path) ? '' : mkdir($path, 0755, true);
             $content = $this->sqlInfo['sql'] . PHP_EOL;
 
