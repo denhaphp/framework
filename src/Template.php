@@ -31,7 +31,8 @@ class Template
         //机器翻译标签 {FY:xxx:en}
         $this->content = preg_replace('/' . $this->left . 'FY:\$(.*?):(.*?)' . $this->right . '/is', '<?php echo \'{FY:\'.$\1.\':\2}\'; ?>', $this->content);
         //替换php函数 {F:XXX}  be echo XXX;
-        $this->content = preg_replace('/' . $this->left . 'F:(.*?)' . $this->right . '/', '<?php echo \1; ?>', $this->content);
+        $this->content = preg_replace('/' . $this->left . 'F:(.*?)' . $this->right . '/', '<?php echo \1; ?>', $this->content); //替换php函数 {:XXX}  be echo XXX;
+        $this->content = preg_replace('/' . $this->left . ':(.*?)' . $this->right . '/', '<?php echo \1; ?>', $this->content);
         //替换{if XXX}
         $this->content = preg_replace('/' . $this->left . 'if(.*?)' . $this->right . '/is', '<?php if(\1){; ?>', $this->content);
         //替换{else}
@@ -67,8 +68,13 @@ class Template
         $file           = fopen($this->loadPath, 'w');
         fwrite($file, $this->content);
         fclose($file);
-        //同步修改时间
+        // 同步时间 为文件修改时间
+        // if (!config('debug')) {
         touch($this->loadPath, filemtime($this->viewPath), filemtime($this->viewPath));
+        // } else {
+        //     // 同步修改时间 为当前时间
+        //     touch($this->loadPath);
+        // }
 
     }
 

@@ -103,6 +103,10 @@ class Mysqli
     public function connect($id = '')
     {
 
+        if (empty(Mysqli::$options['dbConfig'][$id]) && $id) {
+            throw new Exception('connect:id:' . $id . ' 数据库配置信息不存在');
+        }
+
         $this->linkId   = !$id ? reset(Mysqli::$link) : Mysqli::$link[$id];
         $dbConfig       = !$id ? reset(Mysqli::$options['dbConfig']) : Mysqli::$options['dbConfig'][$id];
         $this->tablepre = $dbConfig['db_prefix'];
@@ -430,8 +434,8 @@ class Mysqli
     public function existsTbale($table = '')
     {
         if ($table == '') {$table = $this->table;}
-        $sql                      = "SELECT COUNT(*) as total  FROM information_schema.TABLES WHERE TABLE_NAME='$table'";
-        $t                        = mysqli_fetch_array(mysqli_query($this->linkId, $sql));
+        $sql = "SELECT COUNT(*) as total  FROM information_schema.TABLES WHERE TABLE_NAME='$table'";
+        $t   = mysqli_fetch_array(mysqli_query($this->linkId, $sql));
         if ($t['total'] == 0) {return false;}
         return true;
     }

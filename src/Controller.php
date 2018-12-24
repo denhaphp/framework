@@ -183,14 +183,15 @@ class Controller
         //控制开关
         if (Start::$config['app_debug']) {
             $debug = array(
-                'debug' => array(
-                    'param' => array(
+                'debug' => [
+                    'param' => [
                         'post'  => (array) post('all'),
                         'get'   => (array) get('all'),
                         'files' => $_FILES,
-                    ),
+                    ],
                     'ip'    => getIP(),
-                ),
+                    'sql'   => Trace::$sqlInfo,
+                ],
             );
             $array = array_merge($array, $debug);
         }

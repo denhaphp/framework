@@ -10,6 +10,7 @@ define('FARM_PATH', VENDOR_PATH . 'denha' . DS . 'framework' . DS . 'src' . DS);
 define('APP_PATH', ROOT_PATH . 'appliaction' . DS); // 程序根目录
 define('CONFIG_PATH', ROOT_PATH . 'conf' . DS); // 配置文档目录
 define('DATA_PATH', ROOT_PATH . 'data' . DS); // 缓存目录
+define('DATA_CACHE_PATH', DATA_PATH . 'cache' . DS); // 缓存文件目录
 define('DATA_TPL_PATH', DATA_PATH . 'tpl' . DS); // 缓存模板目录
 define('DATA_SQL_PATH', DATA_PATH . 'sqlLog' . DS); // 数据库日志记录目录
 define('VIEW_PATH', ROOT_PATH . 'resources' . DS); // 资源目录

@@ -230,15 +230,30 @@ class Route
 
         //转换参数
 
-        $paramArray = array_values(explode('/', $uri));
+        $paramItems = array_values(explode('/', $uri));
 
-        $total = count($paramArray);
+        $total = count($paramItems);
+
+        $result = [];
 
         for ($i = 0; $i < $total;) {
-            if (isset($paramArray[$i + 1])) {
-                $_GET[$paramArray[$i]] = urldecode($paramArray[$i + 1]);
+            if (isset($paramItems[$i + 1])) {
+                // 匹配数组
+                $regular = '/(.*?)\[(.*?)\]/';
+                preg_match($regular, $paramItems[$i], $matches);
+                if ($matches) {
+                    // 保存数组信息
+                    if (!isset($_GET[$matches[1]][$matches[2]])) {
+                        $_GET[$matches[1]][$matches[2]] = urldecode($paramItems[$i + 1]);
+                    }
 
-                $result[$paramArray[$i]] = urldecode($paramArray[$i + 1]);
+                    $result[$matches[1]][$matches[2]] = urldecode($paramItems[$i + 1]);
+
+                } else {
+                    $_GET[$paramItems[$i]] = urldecode($paramItems[$i + 1]);
+
+                    $result[$paramItems[$i]] = urldecode($paramItems[$i + 1]);
+                }
             }
             $i += 2;
         }

@@ -95,6 +95,7 @@ class BuildSql
     /** 获取最后执行SQL */
     public function getLastSql()
     {
+
         return $this->sqlInfo['sql'];
     }
 
@@ -123,15 +124,32 @@ class BuildSql
             'field'     => '*',
             'sql'       => '',
             'chilidSql' => false,
-            'data'      => '',
+            'data'      => null,
+            'order'     => null,
+            'group'     => null,
         ];
 
         $this->options = [
             'data'  => [],
             'field' => [],
+            'order' => [],
         ];
 
         $this->connect();
+    }
+
+    /**
+     * 子查询 如果开启 则直接返回sql
+     * @date   2017-11-22T00:38:42+0800
+     * @author ChenMingjiang
+     * @param  boolean                  $value [true：开启子查询 false:关闭子查询]
+     * @return [type]                          [description]
+     */
+    public function childSql($bool = false)
+    {
+        $this->bulid['chilidSql'] = $bool;
+
+        return $this;
     }
 
     /**
@@ -140,16 +158,20 @@ class BuildSql
      * @author ChenMingjiang
      * @param  [type]                   $table   [description]
      * @param  array                    $options [description]
+     *                                  is_tablepre：是否使用表前缀
+     *                                  link：链接数据库配置ID
      * @return [type]                            [description]
      */
-    public function table($table, $options = array())
+    public function table($table, $options = [])
     {
 
         $isTablepre = isset($options['is_tablepre']) ? $options['is_tablepre'] : true;
         $link       = isset($options['link']) ? $options['link'] : '';
 
+        // 初始化SQL参数
         $this->init();
 
+        // 链接其他数据库
         if ($link) {
             $this->connect($link);
         }
@@ -193,18 +215,18 @@ class BuildSql
     private function addFieldTag($field)
     {
         if (
-            strripos($field, '`') === false
-            && $field != '_string'
-            && strripos($field, '*') === false
-            && strripos($field, 'concat') === false
-            && strripos($field, 'sum') === false
-            && strripos($field, 'SUM') === false
-            && strripos($field, 'AVG') === false
-            && strripos($field, 'avg') === false
-            && strripos($field, 'as') === false
-            && strripos($field, 'AS') === false
+            stripos($field, '`') === false
+            && stripos($field, '_STRING') === false
+            && stripos($field, '*') === false
+            && stripos($field, 'CONCAT') === false
+            && stripos($field, 'SUM') === false
+            && stripos($field, 'AVG') === false
+            && stripos($field, 'AVG') === false
+            && stripos($field, 'AS') === false
+            && stripos($field, 'DISTINCT') === false
+            && stripos($field, 'FIELD') === false
         ) {
-            $field = strripos($field, '.') !== false ? str_replace('.', '.`', $field) . '`' : '`' . $field . '`';
+            $field = stripos($field, '.') !== false ? str_replace('.', '.`', $field) . '`' : '`' . $field . '`';
         }
 
         return $field;
@@ -226,14 +248,24 @@ class BuildSql
             return $this;
         }
 
+        // 存在三个参数 $exp => 参数值
         if ($value !== null && $exp !== null) {
             $map[$where] = [$value, $exp];
             $where       = $map;
-        } elseif ($value !== null && $exp === null) {
+
+        }
+        // 存在两个参数
+        elseif ($value !== null && $exp === null) {
+
+            if (is_array($value)) {
+                throw new Exception("SQL Where 参数值错误 {$where} = `数组`");
+            }
+
             $map[$where] = $value;
             $where       = $map;
         }
 
+        // 批量处理数组
         if (is_array($where)) {
             foreach ($where as $mapField => $v) {
 
@@ -256,20 +288,25 @@ class BuildSql
 
             $newWhere = $this->parseWhere($whereMap);
 
-        } else {
+        }
+        // 单条where语句
+        else {
             //记录条件参数
             $this->options['map'][] = $where;
         }
 
-        if (!isset($this->bulid['where'])) {
-            $this->bulid['where'] = ' WHERE ' . substr($newWhere, 5);
-        } else {
-            $this->bulid['where'] .= $newWhere;
+        if (!empty($newWhere)) {
+            if (!isset($this->bulid['where'])) {
+                $this->bulid['where'] = ' WHERE ' . substr($newWhere, 5);
+            } else {
+                $this->bulid['where'] .= $newWhere;
+            }
         }
 
         return $this;
     }
 
+    /** 解析查询条件 */
     public function parseWhere($whereMap)
     {
         if (count($whereMap) > 1) {
@@ -310,6 +347,7 @@ class BuildSql
         return $map;
     }
 
+    /** 处理查询条件 */
     public function parseMap($mapField, $mapExp, $mapValue, $mapLink = 'AND')
     {
         $mapLink = ' ' . $mapLink . ' '; // 连接符
@@ -320,6 +358,7 @@ class BuildSql
             ['between', 'BETWEEN'],
             ['or', 'OR'],
             ['_string', '_STRING'],
+            ['find_in_set', 'FIND_IN_SET'],
         ];
 
         // '>', '<', '>=', '<=', '!=', 'like', '<>'
@@ -363,6 +402,12 @@ class BuildSql
         // '_string', '_STRING'
         elseif (in_array($mapExp, $expRule[5])) {
             $map = $mapValue;
+        }
+        // 'find_in_set', 'FIND_IN_SET'
+        elseif (in_array($mapExp, $expRule[6])) {
+            $map = $mapExp . '(' . $mapValue . ', ' . $mapField . ')';
+        } else {
+            throw new Exception('SQL WHERE 参数错误 `' . $mapExp . '`');
         }
         return [$map, $mapLink];
     }
@@ -411,7 +456,7 @@ class BuildSql
             $this->bulid['limit'] = ' LIMIT ' . $limit . ',' . $pageSize;
         }
 
-        $this->options['limit'] = array('limit' => $limit, 'pageSize' => $pageSize);
+        $this->options['limit'] = ['limit' => $limit, 'pageSize' => $pageSize];
 
         return $this;
     }
@@ -461,6 +506,8 @@ class BuildSql
                     $this->bulid['data'] .= $k . ' = ' . $k . ' - ' . $v[1] . ',';
                 } elseif ($v[0] == 'concat') {
                     $this->bulid['data'] .= $k . ' = CONCAT(' . $k . ',\'\',\'' . str_replace('\'', '\\\'', $v[1]) . '\'),';
+                } elseif ($v[0] == 'json') {
+                    $this->bulid['data'] .= $k . ' = \'' . json_encode($v[1], JSON_UNESCAPED_UNICODE) . '\',';
                 }
             } else {
                 $v = str_replace('\\', '\\\\', $v);
@@ -486,35 +533,62 @@ class BuildSql
 
         $this->options['group'] = is_array($value) ? $value : explode(',', $value);
 
-        $this->bulid['group'] = '';
         foreach ($this->options['group'] as $val) {
             $this->bulid['group'] .= $this->addFieldTag($val) . ',';
         }
 
-        $this->bulid['group'] = ' GROUP BY ' . substr($this->bulid['group'], 0, -1);
+        if (!$this->bulid['order']) {
+            $this->bulid['group'] = ' GROUP BY ' . substr($this->bulid['group'], 0, -1);
+        } else {
+            $this->bulid['group'] = ' , ' . substr($this->bulid['group'], 0, -1);
+        }
 
         return $this;
     }
 
-    /** 排序 */
-    public function order($value)
+    /**
+     *
+     * 排序
+     * @date   2018-12-19T10:53:46+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $value [description]
+     * @return [type]                   [description]
+     */
+    public function order($field)
     {
-        if (!$value) {
+        if (!$field) {
             return $this;
         }
 
-        $this->options['order'] = is_array($value) ? $value : explode(',', $value);
-
-        $this->bulid['order'] = '';
-
-        foreach ($this->options['order'] as $val) {
-            if ($val) {
-                list($field, $exp) = explode(' ', $val);
-                $this->bulid['order'] .= ' ' . $this->addFieldTag($field) . ' ' . $exp . ',';
-            }
+        if (!is_array($field) && stripos($field, '(') === false) {
+            $parseOrder = explode(',', $field);
+        } else {
+            $parseOrder[] = $field;
         }
 
-        $this->bulid['order'] = ' ORDER BY ' . substr($this->bulid['order'], 0, -1);
+        foreach ($parseOrder as $key => $val) {
+
+            // 包含 () 的关键字
+            if (stripos('(', $val) !== false) {
+                $parseOrder[$key] = ' ' . $val;
+            } else {
+                list($field, $exp) = explode(' ', $val);
+                $parseOrder[$key]  = ' ' . $this->addFieldTag($field) . ' ' . $exp;
+            }
+
+        }
+
+        if ($parseOrder) {
+
+            $this->options['order'] = array_merge($parseOrder, $this->options['order']);
+
+            if (!$this->bulid['order']) {
+                $this->bulid['order'] = ' ORDER BY ' . implode(',', $parseOrder);
+            } else {
+                $this->bulid['order'] .= ' , ' . implode(',', $parseOrder);
+            }
+
+        }
 
         return $this;
     }
@@ -540,9 +614,14 @@ class BuildSql
      * @param  boolean                  $value [description]
      * @return [type]                          [description]
      */
-    public function childSql($value = false)
+    public function getSql($bool = true)
     {
-        $this->options['childSql'] = $value;
+        $this->options['childSql'] = $bool;
+
+        if ($bool) {
+            $this->bulidSql('SELECT');
+            return $this->bulid['sql'];
+        }
 
         return $this;
     }
@@ -556,7 +635,7 @@ class BuildSql
      */
     public function childSqlQuery($table)
     {
-        $this->table = '(' . $table . ') as child';
+        $this->bulid['table'] = '(' . $table . ') as child';
 
         return $this;
     }
@@ -790,6 +869,19 @@ class BuildSql
         return $id;
     }
 
+    /**
+     * 添加多条信息
+     * @date   2017-09-19T15:45:40+0800
+     * @author ChenMingjiang
+     */
+    public function addAll($data = [])
+    {
+        foreach ($data as $key => $value) {
+            $result = $this->add($value);
+        }
+        return $result;
+    }
+
     /** 修改保存 */
     public function save($data = '', $exp = null, $value = null)
     {
@@ -885,6 +977,7 @@ class BuildSql
     /** 保存错误SQL记录 */
     public function addErrorSqlLog()
     {
+
         //如果没有写入权限尝试修改权限 如果修改后还是失败 则跳过
         if (isWritable(DATA_PATH)) {
             $path = DATA_SQL_PATH . $this->options['database'] . DS;
@@ -939,7 +1032,7 @@ class BuildSql
             //记录慢sql
             if (self::$dbConfig[$this->id]['slow_log']) {
                 if ($this->sqlInfo['time'] > self::$dbConfig[$this->id]['slow_time']) {
-                    $path = 'slow_' . $text;
+                    $path = 'slow_' . date('Y_m_d_H', TIME) . '.text';
                 }
             }
 

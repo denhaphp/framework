@@ -1,6 +1,8 @@
  <?php
 
+use denha\Cache;
 use denha\Route;
+use denha\Start;
 
 if (!function_exists('GSF')) {
     function GSF($array, $v)
@@ -105,6 +107,31 @@ if (!function_exists('auth')) {
         } else {
             return $keyc . rtrim(strtr(base64_encode($result), '+/', '-_'), '=');
         }
+    }
+}
+
+if (!function_exists('cache')) {
+    /**
+     * 缓存
+     * @date   2018-09-15T11:27:15+0800
+     * @author ChenMingjiang
+     * @param  string                   $name   [缓存Key]
+     * @param  string                   $value  [缓存信息]
+     * @param  integer                  $expire [过期时间 0则永不过期]
+     * @return [type]                           [description]
+     */
+    function cache($name, $value = '', $expire = 0)
+    {
+        $cache = Cache::connect();
+        if ($value === null) {
+            $result = $cache->del($name);
+        } elseif ($value === '') {
+            $result = $cache->read($name);
+        } else {
+            $result = $cache->save($name, $value, $expire);
+        }
+
+        return $result;
     }
 }
 
@@ -394,6 +421,8 @@ if (!function_exists('get')) {
                 if (!is_array($val)) {
                     $val        = trim($val);
                     $data[$key] = !get_magic_quotes_gpc() ? htmlspecialchars(addslashes($val), ENT_QUOTES, 'UTF-8') : htmlspecialchars($val, ENT_QUOTES, 'UTF-8');
+                } else {
+                    $data[$key] = $val;
                 }
             }
 
@@ -585,7 +614,7 @@ if (!function_exists('imgUrl')) {
      */
     function imgUrl($name, $path = '', $size = 0, $host = false)
     {
-
+        $data = [];
         if (stripos($name, ',') !== false && !is_array($name)) {
             $imgName = explode(',', $name);
         } else {
@@ -610,8 +639,7 @@ if (!function_exists('imgUrl')) {
             $data[] = $url;
         }
 
-        $data = count($data) > 1 ? $data : current($data)
-        ;
+        $data = count($data) > 1 ? $data : current($data);
         return $data;
     }
 }
@@ -875,8 +903,8 @@ if (!function_exists('url')) {
     function url($location = null, $params = [], $options = [])
     {
 
-        $hostUrl = isset($options['host']) ? isset($options['host']) : URL; // 前缀域名
-        $isGet   = isset($options['is_get']) ? isset($options['is_get']) : true; // 开启伪静态 true开启 false关闭
+        $hostUrl = isset($options['host']) ? $options['host'] : URL; // 前缀域名
+        $isGet   = isset($options['is_get']) ? $options['is_get'] : true; // 开启伪静态 true开启 false关闭
 
         // 外链直接返回
         if (stripos($location, 'http://') !== false || stripos($location, 'https://') !== false) {
@@ -936,7 +964,11 @@ if (!function_exists('url')) {
             $uri = $routeUrl . $param;
         }
 
-        return $hostUrl . $uri;
+        if (!$hostUrl) {
+            return $uri;
+        } else {
+            return $hostUrl . $uri;
+        }
     }
 }
 
@@ -979,9 +1011,12 @@ if (!function_exists('post')) {
 
         if ($name == 'all') {
             foreach ($_POST as $key => $val) {
-                $val        = trim($val);
-                $data[$key] = !get_magic_quotes_gpc() ? htmlspecialchars(addslashes($val), ENT_QUOTES, 'UTF-8') : htmlspecialchars($val, ENT_QUOTES, 'UTF-8');
-
+                if (!is_array($val)) {
+                    $val        = trim($val);
+                    $data[$key] = !get_magic_quotes_gpc() ? htmlspecialchars(addslashes($val), ENT_QUOTES, 'UTF-8') : htmlspecialchars($val, ENT_QUOTES, 'UTF-8');
+                } else {
+                    $data[$key] = $val;
+                }
             }
 
         } else {
@@ -999,6 +1034,27 @@ if (!function_exists('post')) {
         }
 
         return isset($data) ? $data : '';
+    }
+}
+
+if (!function_exists('params')) {
+    /**
+     * params过滤 可直接获取 GET POST参数
+     * @date   2018-07-12T17:10:04+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $name    [description]
+     * @param  string                   $type    [description]
+     * @param  string                   $default [description]
+     * @return [type]                            [description]
+     */
+    function params($name, $type = '', $default = '')
+    {
+        $data = get($name, $type, '');
+        if (!$data) {
+            $data = post($name, $type, $default);
+        }
+
+        return $data;
     }
 }
 

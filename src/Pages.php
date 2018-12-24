@@ -117,8 +117,8 @@ class Pages
                 $this->pageUrl = $this->pageUrl . '&pageNo=';
             }
 
-            $pages = '<div class="pull-right page-box" pages-data="pages" param-data="param" page-function="getPageList()">' . "\r\n";
-            $pages .= '<div class="pagination-info">当前' . $this->pageNo . ' - ' . ($this->pageNo * $this->pageSize) . '/' . ($this->allPage * $this->pageSize) . ' 条</div>' . "\r\n";
+            $pages = '<div class="pull-left page-box">' . "\r\n";
+            $pages .= '<div class="pagination-info hidden-sm hidden-xs">当前' . $this->pageNo . ' - ' . ($this->pageNo * $this->pageSize) . '/' . ($this->allPage * $this->pageSize) . ' 条</div>' . "\r\n";
             $pages .= '<ul class="pagination hidden-sm hidden-xs" >' . "\r\n";
             if ($this->pageNo > $this->showPageFigure) {
                 $pages .= '<li><a href="' . $this->pageUrl . '1">«</a></li>' . "\r\n";
