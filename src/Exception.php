@@ -1,4 +1,7 @@
 <?php
+//------------------------
+//· 错误调试信息
+//---------------------
 namespace denha;
 
 class Exception extends \Exception

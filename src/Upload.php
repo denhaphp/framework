@@ -1,4 +1,7 @@
 <?php
+//------------------------
+//· 上传类
+//-------------------------
 namespace denha;
 
 /**
@@ -8,7 +11,7 @@ namespace denha;
  * 1.对目标目录是否存在的判断
  * 2.如果上传时出现重名，自动重命名
  *
- * @author M.Q. <[url]www.mengqi.net[/url]>
+ * @author M.Q
  */
 class Upload
 {
@@ -166,7 +169,7 @@ class Upload
                 $rest = $this->save($file, $this->path);
                 for ($i = 0, $n = count($this->file); $i < $n; $i++) {
                     if ($rest) {
-                        $this->file[$i]['url']          = 'http://' . $_SERVER['HTTP_HOST'] . $this->path . '/' . $this->file[$i]['filename'];
+                        $this->file[$i]['url'] = 'http://' . $_SERVER['HTTP_HOST'] . $this->path . '/' . $this->file[$i]['filename'];
                     } else { $this->file[$i]['url'] = '';}
                 }
             }
@@ -247,20 +250,3 @@ class Upload
         return $this->error;
     }
 }
-
-/*$a = new upload('upfile');
-
-$fileinfo = $a -> getFileInfo();
-if ($fileinfo == false)
-{
-echo '没有上传文件！';
-exit;
-}
-
-for($i = 0; $i < count($fileinfo); $i++)
-{
-echo '正在上传 '.$fileinfo[$i]['name'].' ';
-if ($a -> save($fileinfo[$i], 'upload')) echo '完毕';
-else echo '失败';
-echo '<br>';
-}  */

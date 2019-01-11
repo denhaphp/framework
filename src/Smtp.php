@@ -1,4 +1,7 @@
 <?php
+//------------------------
+//· email类
+//---------------------
 namespace denha;
 
 class Smtp
