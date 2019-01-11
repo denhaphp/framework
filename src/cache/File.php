@@ -8,22 +8,22 @@ class File
 {
     public static $config;
     public static $path;
-    public static $ext = '.text';
-    public static $instance;
+    public static $ext      = '.txt';
+    public static $instance = [];
 
-    public static function init()
+    public static function init($options = [])
     {
-        if (!self::$config) {
-            self::$config = config('cache');
+
+        $id = md5(json_encode($options));
+
+        if (!isset(self::$instance[$id])) {
+            self::$config = $options;
             self::$path   = self::$config['dir'] ? self::$config['dir'] : DATA_CACHE_PATH;
             is_dir(self::$path) ? '' : mkdir(self::$path, 0755, true);
+            self::$instance[$id] = new File;
         }
 
-        if (!self::$instance) {
-            self::$instance = new File;
-        }
-
-        return self::$instance;
+        return self::$instance[$id];
     }
 
     public function read($name)
@@ -31,7 +31,7 @@ class File
         $path = self::$path . md5($name) . self::$ext;
         if (is_file($path)) {
             $data                   = file_get_contents($path);
-            list($content, $expire) = explode(':::', $data);
+            list($content, $expire) = !empty($data) ? explode(':::', $data) : ['', 0];
             // 过期删除
             if ($expire && $expire > TIME) {
                 $this->del($name);

@@ -17,6 +17,7 @@ class BuildSql
     public $link; // 当前链接符
     public $options; // 记录参数信息
     public $bulid; // 记录构造Sql;
+    public $config; //
 
     private function __construct($dbConfig = '')
     {
@@ -102,16 +103,17 @@ class BuildSql
     /** 链接 */
     public function connect($id = 0)
     {
-        $this->id       = $id;
-        $this->link     = self::$do[md5(json_encode(self::$dbConfig[$id]))];
-        $this->tablepre = self::$dbConfig[$id]['prefix'];
+        $this->id   = $id;
+        $this->link = self::$do[md5(json_encode(self::$dbConfig[$id]))];
 
         if (!$this->link) {
             throw new Exception('链接信息异常');
         }
 
-        $this->options['tablepre'] = self::$dbConfig[$id]['prefix'];
-        $this->options['database'] = self::$dbConfig[$id]['name'];
+        $this->config              = self::$dbConfig[$id];
+        $this->tablepre            = $this->config['prefix'];
+        $this->options['tablepre'] = $this->config['prefix'];
+        $this->options['database'] = $this->config['name'];
 
         return $this;
     }
@@ -493,6 +495,7 @@ class BuildSql
         $data = is_array($data) ? $data : explode(',', $data);
 
         $this->options['data'] = $data;
+        $this->bulid['data']   = '';
 
         foreach ($data as $k => $v) {
             $k = $this->addFieldTag($k);
@@ -876,9 +879,15 @@ class BuildSql
      */
     public function addAll($data = [])
     {
-        foreach ($data as $key => $value) {
-            $result = $this->add($value);
+
+        $this->startTrans();
+
+        foreach ($data as $item) {
+            $result = $this->add($item);
         }
+
+        $this->commit();
+
         return $result;
     }
 
@@ -909,21 +918,21 @@ class BuildSql
         return $num;
     }
 
-    //开启事务
+    // 开启事务
     public function startTrans()
     {
         $this->link->beginTransaction();
         return true;
     }
 
-    //回滚事务
+    // 回滚事务
     public function rollback()
     {
         $this->link->rollBack();
         return true;
     }
 
-    //提交事务
+    // 提交事务
     public function commit()
     {
         $this->link->commit();
@@ -947,16 +956,24 @@ class BuildSql
         $this->sqlInfo['time'] = $_endTime - $_beginTime; //获取执行时间
         $this->sqlInfo['sql']  = $this->bulid['sql'];
 
+        // 执行成功
         if ($result) {
-            Trace::addSqlInfo($this->sqlInfo); //存入调试信息中
-            //存入文件中
-            if (self::$dbConfig[$this->id]['save_log']) {
+
+            if (!empty($this->config['sql_explain'])) {
+                $this->sqlInfo['explain'] = $this->link->query('explain ' . $this->bulid['sql'])->fetchAll(PDO::FETCH_ASSOC);
+            }
+
+            // 存入调试信息中
+            Trace::addSqlInfo($this->sqlInfo);
+            // 存入文件中
+            if ($this->config['save_log']) {
                 $this->addSqlLog();
             }
+
             return $result;
         } else {
-            //存入文件
-            if (self::$dbConfig[$this->id]['error_log']) {
+            // 存入文件
+            if ($this->config['error_log']) {
                 $this->addErrorSqlLog();
             }
 
@@ -1006,7 +1023,7 @@ class BuildSql
      */
     public function addSqlLog()
     {
-        //如果没有写入权限尝试修改权限 如果修改后还是失败 则跳过
+        // 如果没有写入权限尝试修改权限 如果修改后还是失败 则跳过
         if (!isWritable(DATA_PATH)) {
             return false;
         }
@@ -1020,19 +1037,19 @@ class BuildSql
         $info .= ' | Url:' . URL . '/' . Route::$uri;
         $info .= PHP_EOL;
 
-        //记录sql
-        if ($this->sqlInfo && self::$dbConfig[$this->id]['save_log']) {
-            $path = DATA_SQL_PATH . $this->options['database'] . DS;
-            is_dir($path) ? '' : mkdir($path, 0755, true);
+        // 如果存在sql信息 并且开启日志记录
+        if ($this->sqlInfo && $this->config['save_log']) {
+            $basePath = DATA_SQL_PATH . $this->options['database'] . DS;
+            is_dir($basePath) ? '' : mkdir($basePath, 0755, true);
             $content = $this->sqlInfo['sql'] . PHP_EOL;
 
-            $path .= isset($this->options['type']) ? strtolower($this->options['type']) : 'other';
+            $path = $basePath . isset($this->options['type']) ? strtolower($this->options['type']) : 'other';
             $path .= '_' . date('Y_m_d_H', TIME) . '.text';
 
             //记录慢sql
-            if (self::$dbConfig[$this->id]['slow_log']) {
-                if ($this->sqlInfo['time'] > self::$dbConfig[$this->id]['slow_time']) {
-                    $path = 'slow_' . date('Y_m_d_H', TIME) . '.text';
+            if ($this->config['slow_log']) {
+                if ($this->sqlInfo['time'] > $this->config['slow_time']) {
+                    $path = $basePath . 'slow_' . date('Y_m_d_H', TIME) . '.text';
                 }
             }
 

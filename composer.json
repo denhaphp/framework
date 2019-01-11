@@ -21,7 +21,7 @@
     },
     "autoload": {
         "files": [  
-            "src/Function.php"
+            "helper.php"
         ],
         "psr-4": {
             "denha\\": "src"

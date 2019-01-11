@@ -9,8 +9,8 @@ class Trace
     private static $tracePageTabs  = ['BASE' => '基本', 'FILE' => '文件', 'ERR|NOTIC' => '错误', 'SQL' => 'SQL', 'DEBUG' => '调试'];
     private static $traceErrorType = [0 => '', 1 => 'FATAL ERROR', 2 => 'WARNING', 4 => 'PARSE', 8 => 'NOTICE', 100 => 'SQL'];
 
-    public static $errorInfo = array(); //错误信息
-    public static $sqlInfo   = array(); //sql执行信息
+    public static $errorInfo = []; //错误信息
+    public static $sqlInfo   = []; //sql执行信息
 
     //执行
     public static function run()
@@ -21,7 +21,7 @@ class Trace
     //展示调试信息
     private static function showTrace()
     {
-        $trace = array();
+        $trace = [];
         $tabs  = self::$tracePageTabs;
         foreach ($tabs as $name => $title) {
             switch (strtoupper($name)) {
@@ -149,13 +149,18 @@ class Trace
     public static function addSqlInfo($data)
     {
         if (is_array($data)) {
-            $info = 'SQL :' . $data['sql'] . ' [' . $data['time'] . 's]';
+            $info[] = 'SQL :' . $data['sql'] . ' [' . $data['time'] . 's]';
+            if (isset($data['explain'])) {
+                foreach ($data['explain'] as $explain) {
+                    $info[] = 'EXPLAIN :' . json_encode($explain);
+                }
+            }
         } else {
-            $info = $data;
+            $info[] = $data;
         }
 
         if (!self::$sqlInfo) {
-            self::$sqlInfo[] = $info;
+            self::$sqlInfo = $info;
         } else {
             self::$sqlInfo = array_merge(self::$sqlInfo, (array) $info);
         }
@@ -219,7 +224,7 @@ class Trace
     private static function fileInfo()
     {
         $files = get_included_files();
-        $info  = array();
+        $info  = [];
 
         foreach ($files as $key => $file) {
             $info[] = $file . ' ( ' . number_format(filesize($file) / 1024, 2) . ' KB )';

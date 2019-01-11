@@ -77,7 +77,7 @@ if (!function_exists('auth')) {
         $result = '';
         $box    = range(0, 255);
 
-        $rndkey = array();
+        $rndkey = [];
         for ($i = 0; $i <= 255; $i++) {
             $rndkey[$i] = ord($cryptkey[$i % $key_length]);
         }
@@ -115,14 +115,15 @@ if (!function_exists('cache')) {
      * 缓存
      * @date   2018-09-15T11:27:15+0800
      * @author ChenMingjiang
-     * @param  string                   $name   [缓存Key]
-     * @param  string                   $value  [缓存信息]
-     * @param  integer                  $expire [过期时间 0则永不过期]
-     * @return [type]                           [description]
+     * @param  string                   $name    [缓存Key]
+     * @param  string                   $value   [缓存信息]
+     * @param  integer                  $expire  [过期时间 0则永不过期]
+     * @param  integer                  $options [参数配置]
+     * @return [type]                            [description]
      */
-    function cache($name, $value = '', $expire = 0)
+    function cache($name, $value = '', $expire = 0, $options = [])
     {
-        $cache = Cache::connect();
+        $cache = Cache::connect($options);
         if ($value === null) {
             $result = $cache->del($name);
         } elseif ($value === '') {
@@ -180,7 +181,7 @@ if (!function_exists('cookie')) {
      * @param  array                    $options [description]
      * @return [type]                            [description]
      */
-    function cookie($name = '', $value = '', $options = array())
+    function cookie($name = '', $value = '', $options = [])
     {
 
         $config = array_merge(denha\Start::$config['cookie'], array_change_key_case((array) $options));
@@ -228,7 +229,7 @@ if (!function_exists('dao')) {
      */
     function dao($name, $app = '')
     {
-        static $_dao = array();
+        static $_dao = [];
 
         if (!$app) {
             $class = 'dao\\base\\' . $name;
@@ -459,7 +460,7 @@ if (!function_exists('getVar')) {
      */
     function getVar($filename, $path, $ext = EXT)
     {
-        static $_vars = array();
+        static $_vars = [];
 
         if (!$filename) {
             return null;
@@ -496,7 +497,7 @@ if (!function_exists('getConfig')) {
      */
     function getConfig($path = 'config', $name = '')
     {
-        static $_configData = array();
+        static $_configData = [];
 
         if (!isset($_configData[$path])) {
 
@@ -601,6 +602,33 @@ if (!function_exists('isWritable')) {
     }
 }
 
+if (!function_exists('imgExists')) {
+    /**
+     * 判断图片是否存在
+     * @date   2019-01-09T17:52:30+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $imgUrl [description]
+     * @return [type]                   [description]
+     */
+    function imgExists($imgUrl)
+    {
+        $ch = curl_init($imgUrl);
+        // 不取回数据
+        curl_setopt($ch, CURLOPT_TIMEOUT, 1);
+        curl_setopt($ch, CURLOPT_NOBODY, true);
+        // 发送请求
+        $result = curl_exec($ch);
+        $code   = curl_getinfo($ch, CURLINFO_HTTP_CODE); // 获取返回的状态码
+        curl_close($ch); // 关闭CURL会话
+
+        if ($code == 200) {
+            return true;
+        }
+
+        return false;
+    }
+}
+
 if (!function_exists('imgUrl')) {
     /**
      * 获取上传图片地址
@@ -612,7 +640,7 @@ if (!function_exists('imgUrl')) {
      * @param  boolean                  $host [description]
      * @return [type]                         [description]
      */
-    function imgUrl($name, $path = '', $size = 0, $host = false)
+    function imgUrl($name, $path = '', $size = '', $host = false)
     {
         $data = [];
         if (stripos($name, ',') !== false && !is_array($name)) {
@@ -621,19 +649,49 @@ if (!function_exists('imgUrl')) {
             $imgName = is_array($name) ? $name : (array) $name;
         }
 
-        foreach ($imgName as $key => $value) {
-            if (!$value) {
+        foreach ($imgName as $imgName) {
+            if (!$imgName) {
                 $url = config('ststic') . '/default.png';
                 $url = !$host ? $url : $host . $url;
+            } elseif ($size) {
+                $ext        = pathinfo($name, PATHINFO_EXTENSION);
+                $zipImgName = basename($name, '.' . $ext) . '_' . $size . '.' . $ext;
+                $url        = config('uploadfile') . 'zipimg/' . $zipImgName;
+
+                // 如果不存在缓存 缩略图则创建缩略图
+                $zipimglists = cache('zipimglists');
+                if (!isset($zipimglists[md5($zipImgName)])) {
+
+                    if ($path) {
+                        $url = config('uploadfile') . $path . '/' . $imgName;
+                    } else {
+                        $url = config('uploadfile') . $imgName;
+                    }
+
+                    // 根据原图 创建新的缩略图
+                    if (imgExists($url)) {
+                        $size   = explode('x', $size);
+                        $width  = $size[0];
+                        $height = !empty($size[1]) ? $size[1] : 0;
+                        $res    = dao('File')->zipImg($url, $width, $height)['status'];
+
+                        if ($res) {
+                            $url = config('uploadfile') . 'zipimg/' . $zipImgName;
+                        }
+
+                    } else {
+                        $url = config('ststic') . '/default.png';
+                    }
+
+                }
             } else {
                 if ($path) {
-                    $url = config('uploadfile') . $path . '/' . $value;
+                    $url = config('uploadfile') . $path . '/' . $imgName;
                 } else {
-                    $url = config('uploadfile') . $value;
+                    $url = config('uploadfile') . $imgName;
                 }
 
                 $url = !$host ? $url : $host . $url;
-
             }
 
             $data[] = $url;
@@ -647,23 +705,29 @@ if (!function_exists('imgUrl')) {
 if (!function_exists('response')) {
 
     /**
-     * curl模拟GET/POST/PUT/DELETE
-     * @date   2018-01-11T14:24:16+0800
+     * curl模拟
+     * @date   2019-01-11T11:56:24+0800
      * @author ChenMingjiang
-     * @param  [type]                   $url    [请求网址]
-     * @param  string                   $method [请求类型 GET/POST/PUT/DELETE]
-     * @param  array                    $param  [请求超时]
-     * @param  array                    $header [头标记]
-     * @return [type]                           [description]
+     * @param  [type]                   $url     [请求地址]
+     * @param  string                   $method  [请求类型 GET/POST/PUT/DELETE]
+     * @param  array                    $param   [请求参数]
+     * @param  array                    $headers [请求头部信息]
+     * @param  array                    $options [配置项]
+     *                                           isJson：是否返回json数据 默认是
+     *                                           debug： 是否开启调试模式 默认否
+     *                                           ssl：证书认证地址
+     *                                           isCode:是否返回请求页面状态码
+     * @return [type]                   [description]
      */
-    function response($url, $method = 'GET', $param = array(), $headers = array(), $options = array())
+    function response($url, $method = 'GET', $param = [], $headers = [], $options = [])
     {
 
         $isJson = isset($options['is_json']) ? $options['is_json'] : true;
         $debug  = isset($options['debug']) ? $options['debug'] : false;
-        $ssl    = isset($options['ssl']) ? $options['ssl'] : array();
+        $ssl    = isset($options['ssl']) ? $options['ssl'] : [];
+        $isCode = isset($options['is_code']) ? $options['is_code'] : false;
 
-        $ch = curl_init(); //初始化curl
+        $ch = curl_init(); // 初始化curl
 
         switch ($method) {
             case 'GET':
@@ -695,7 +759,7 @@ if (!function_exists('response')) {
                 break;
         }
 
-        //设置请求头
+        // 设置请求头
         if (count($headers) > 0) {
             curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         }
@@ -723,7 +787,7 @@ if (!function_exists('response')) {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1); // 获取的信息以文件流的形式返回
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0); // 从证书中检查SSL加密算法是否存在
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0); // 对认证证书来源的检查
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // 请求超时时间
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10); // 请求超时时间
         curl_setopt($ch, CURLOPT_URL, $url); // 要访问的地址
 
         $data = curl_exec($ch);
@@ -756,13 +820,20 @@ if (!function_exists('response')) {
 
         if ('200' == $code) {
             if ($isJson) {
-                return json_decode($data, true);
+                $res = json_decode($data, true);
+            } else {
+                $res = $data;
             }
-
-            return $data;
         } else {
-            return curl_error($ch);
+            $res = curl_error($ch);
         }
+
+        // 返回请求code
+        if ($isCode) {
+            $res = ['code' => $code, 'data' => $res];
+        }
+
+        return $res;
     }
 }
 if (!function_exists('strCut')) {

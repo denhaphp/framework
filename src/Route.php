@@ -13,6 +13,8 @@ class Route
         'uri'  => '', // 原生地址
         'rule' => [], // 改写路由信息
     ];
+    public static $id         = 0;
+    public static $regularUrl = [];
 
     //执行主体
     public static function main($route = 'mca')
@@ -62,14 +64,27 @@ class Route
      */
     public static function rule($url, $changeUrl = '/', $options = [])
     {
-        self::$rule[] = [
+
+        $params      = isset($options['params']) ? $options['params'] : '';
+        $suffix      = isset($options['suffix']) ? $options['suffix'] : '/';
+        $limitSuffix = isset($options['limit_suffix']) ? explode(',', $options['limit_suffix']) : '';
+        $jump        = isset($options['jump']) ? $options['jump'] : false;
+
+        $key = md5($changeUrl . $params);
+
+        self::$rule[self::$id] = [
             'url'          => $url,
             'change_url'   => $changeUrl,
-            'params'       => isset($options['params']) ? $options['params'] : '',
-            'suffix'       => isset($options['suffix']) ? $options['suffix'] : '/',
-            'limit_suffix' => isset($options['limit_suffix']) ? explode(',', $options['limit_suffix']) : '',
-            'jump'         => isset($options['jump']) ? $options['jump'] : false,
+            'params'       => $params,
+            'suffix'       => $suffix,
+            'limit_suffix' => $limitSuffix,
+            'jump'         => $jump,
         ];
+
+        self::$regularUrl['url'][md5($url . $params)]             = self::$id;
+        self::$regularUrl['changeUrl'][md5($changeUrl . $params)] = self::$id;
+
+        self::$id++;
     }
 
     // 解析请求URL
@@ -105,30 +120,28 @@ class Route
 
         $isJump = false; //是否自动跳转
 
-        // 原始地址+参数匹配 有限
-        foreach (self::$rule as $rule) {
-            if ($rule['change_url'] == $changeUrl && $rule['params'] && $rule['params'] == $params) {
-                $url    = $rule['url'];
+        // 原始地址+参数匹配 完全匹配
+        $keyMD5 = md5($changeUrl . $params);
+        if (isset(self::$regularUrl['changeUrl'][$keyMD5])) {
+            $rule   = &self::$rule[self::$regularUrl['changeUrl'][$keyMD5]];
+            $url    = $rule['url'];
+            $isJump = $rule['jump'];
+
+            self::$thisRule['rule'] = $rule; // 保存改写路由信息
+            self::changeGetValue($rule['params']); // 保存GET参数
+        }
+
+        // 若完全匹配不存在 则不匹配参数只匹配路径  部分匹配
+        if (!self::$thisRule['rule']) {
+            $keyMD5 = md5($changeUrl);
+            if (isset(self::$regularUrl['changeUrl'][$keyMD5])) {
+                $rule   = &self::$rule[self::$regularUrl['changeUrl'][$keyMD5]];
+                $url    = $rule['url'] . ($params ? '/s/' . $params : '');
                 $isJump = $rule['jump'];
 
                 self::$thisRule['rule'] = $rule; // 保存改写路由信息
                 self::changeGetValue($rule['params']); // 保存GET参数
-                break;
-            }
 
-        }
-
-        // 改写地址匹配
-        if (!self::$thisRule['rule']) {
-            foreach (self::$rule as $rule) {
-                if ($rule['change_url'] == $changeUrl) {
-                    $url    = $rule['url'] . ($params ? '/s/' . $params : '');
-                    $isJump = $rule['jump'];
-
-                    self::$thisRule['rule'] = $rule; // 保存改写路由信息
-                    self::changeGetValue($rule['params']); // 保存GET参数
-                    break;
-                }
             }
         }
 
@@ -140,33 +153,33 @@ class Route
         return isset($url) ? $url : $uri;
     }
 
-    // 获取转换的路由地址
+    // 获取改写路径
     public static function getRouteChangeUrl($uri, $params = '')
     {
 
         list($changeUrl, $params) = self::parseRouteUri($uri);
 
-        // 判断匹配路由
-        foreach (self::$rule as $rule) {
-            if ($rule['url'] == $changeUrl && $rule['params'] && $rule['params'] == $params) {
-                self::changeGetValue($rule['params']); // 保存GET信息
-                if ($rule['change_url']) {
-                    $url = $rule['change_url'] . $rule['suffix'];
-                } else {
-                    $url = $rule['change_url'];
-                }
-
-                break;
+        // 原始地址+参数匹配 完全匹配
+        $keyMD5 = md5($changeUrl . $params);
+        if (isset(self::$regularUrl['url'][$keyMD5])) {
+            $rule = &self::$rule[self::$regularUrl['url'][$keyMD5]];
+            self::changeGetValue($rule['params']); // 保存GET信息
+            if ($rule['change_url']) {
+                $url = $rule['change_url'] . $rule['suffix'];
+            } else {
+                $url = $rule['change_url'];
             }
+
         }
 
+        // 若完全匹配不存在 则不匹配参数只匹配路径  部分匹配
         if (!isset($url)) {
-            foreach (self::$rule as $rule) {
-                if ($rule['url'] == $changeUrl) {
-                    // 增加自带参数 过来 多"/"情况
-                    $url = '/' . ltrim(($rule['change_url'] . ($params ? '/s/' . $params : '') . $rule['suffix']), '/');
-                    break;
-                }
+            $keyMD5 = md5($changeUrl);
+            if (isset(self::$regularUrl['url'][$keyMD5])) {
+                $rule = &self::$rule[self::$regularUrl['url'][$keyMD5]];
+                // 增加自带参数 过来 多"/"情况
+                $url = '/' . ltrim(($rule['change_url'] . ($params ? '/s/' . $params : '') . $rule['suffix']), '/');
+
             }
         }
 
