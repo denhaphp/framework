@@ -154,16 +154,16 @@ if (!function_exists('config')) {
             $data = getConfig($path, $name);
         } else {
             if ($name && count($nameArr) == 1) {
-                $data = denha\Start::$config[$name];
+                $data = Start::$config[$name];
             } elseif ($name && count($nameArr) > 1) {
-                $data = denha\Start::$config[$nameArr[0]];
+                $data = Start::$config[$nameArr[0]];
                 foreach ($nameArr as $key => $value) {
                     if ($key) {
                         $data = $data[$value];
                     }
                 }
             } else {
-                $data = denha\Start::$config;
+                $data = Start::$config;
             }
         }
 
@@ -495,7 +495,7 @@ if (!function_exists('getConfig')) {
      * @param  string                   $name [文件名称]
      * @return [type]                         [description]
      */
-    function getConfig($path = 'config', $name = '')
+    function getConfig($path = 'config', $name = null)
     {
         static $_configData = [];
 
@@ -797,11 +797,14 @@ if (!function_exists('response')) {
 
         if ($debug) {
             print_r('-------Curl开启-----' . PHP_EOL);
+            print_r('-------输入参数Url-----' . PHP_EOL);
+            print_r($url . PHP_EOL);
+            print_r('-------END-----' . PHP_EOL);
             print_r('-------输入参数Method-----' . PHP_EOL);
             print_r($method . PHP_EOL);
             print_r('-------END-----' . PHP_EOL);
-            print_r('-------输入参数Url-----' . PHP_EOL);
-            print_r($url . PHP_EOL);
+            print_r('-------输入参数param-----' . PHP_EOL);
+            print_r($param);
             print_r('-------END-----' . PHP_EOL);
             print_r('-------输入参数header-----' . PHP_EOL);
             print_r($headers);
@@ -1038,7 +1041,11 @@ if (!function_exists('url')) {
         if (!$hostUrl) {
             return $uri;
         } else {
-            return $hostUrl . $uri;
+            if ($uri == '//') {
+                return $hostUrl;
+            } else {
+                return $hostUrl . $uri;
+            }
         }
     }
 }
