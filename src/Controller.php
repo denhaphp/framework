@@ -145,23 +145,69 @@ class Controller
 
     /**
      * ajax返回
-     * @date   2017-06-13T22:48:29+0800
+     * @date   2019-01-17T21:33:34+0800
+     * ajaxReturn(true,'xxx',['abc'=>111]) => ['status'=>true,'msg'=>'xxx',data=>['abc'=>111]]
+     * ajaxReturn(false,'xxx') => ['status'=>false,'msg'=>'xxx']
+     * ajaxReturn(['status'=>true,'msg'=>'xxx','data'=>['abc'=>111]]) => ['status'=>true,'msg'=>'xxx','data'=>['abc'=>111]]
+     * ajaxReturn(false,['abc'=>111]) => ['status'=>false,'msg'=>'操作成功',data=>['abc'=>111]]
      * @author ChenMingjiang
-     * @param  [type]                   $value [description]
-     * @return [type]                          [description]
+     * @param  [type]                   $status [array则直接合并 bool则表示status]
+     * @param  [type]                   $msg    [array则表示为data值 string则表示msg]
+     * @param  [type]                   $data   [返回参数]
+     * @param  string                   $lg     [语言类型]
+     * @return [type]                           [description]
      */
-    protected function ajaxReturn($value, $lg = 'zh')
+    public function ajaxReturn($status, $msg = null, $data = null)
     {
         header("Content-Type:application/json; charset=utf-8");
-        $array = array(
-            'status' => true,
-            'data'   => array(),
-            'msg'    => '操作成功',
-        );
-        $value = array_merge($array, $value);
-        if ($lg != 'zh') {
-            $value['msg'] = dao('BaiduTrans')->baiduTrans($value['msg'], $this->lg);
+
+        // 处理参数信息
+        if (is_array($status)) {
+            $value = $status;
+        } else {
+            $value['status'] = $status;
+            if (is_array($msg)) {
+                $value['data'] = $msg;
+            } elseif ($msg !== null) {
+                $value['msg'] = $msg;
+            }
+
+            if ($data !== null) {
+                $value['data'] = $data;
+            }
         }
+
+        $array = [
+            'status' => true,
+            'data'   => [],
+            'msg'    => '操作成功',
+        ];
+
+        // 控制开关
+        if (Start::$config['app_debug']) {
+            $debug = [
+                'debug' => [
+                    'param' => [
+                        'post'  => (array) post('all'),
+                        'get'   => (array) get('all'),
+                        'files' => $_FILES,
+                    ],
+                    'ip'    => getIP(),
+                    'sql'   => Trace::$sqlInfo,
+                ],
+            ];
+            $array = array_merge($array, $debug);
+        }
+
+        $value = array_merge($array, $value);
+
+        // jsonpReturn返回
+        $callback = get('callbak', 'text', '');
+        if ($callback && IS_GET) {
+            exit($callback . '(' . json_encode($value) . ')');
+        }
+
+        // 正常ajax返回
         exit(json_encode($value));
     }
 
