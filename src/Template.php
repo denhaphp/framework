@@ -11,6 +11,7 @@ class Template
     public $viewPath;
     public $loadPath;
     public $content;
+    public $editTime; // 最新修改时间
 
     public function __construct($viewPath)
     {
@@ -57,6 +58,20 @@ class Template
 
     }
 
+    // 获取最新文件修改时间
+    public function editTimeDiff($time)
+    {
+        if (!$this->editTime) {
+            $this->editTime = $time;
+        }
+
+        if ($this->editTime < $time) {
+            $this->editTime = $time;
+        }
+
+        return $this->editTime;
+    }
+
     public function saveFile()
     {
         //如果没有写入权限尝试修改权限 如果修改后还是失败 则跳过
@@ -71,13 +86,11 @@ class Template
         $file           = fopen($this->loadPath, 'w');
         fwrite($file, $this->content);
         fclose($file);
-        // 同步时间 为文件修改时间
-        // if (!config('debug')) {
-        touch($this->loadPath, filemtime($this->viewPath), filemtime($this->viewPath));
-        // } else {
-        //     // 同步修改时间 为当前时间
-        //     touch($this->loadPath);
-        // }
+
+        // $filemtime = $this->editTimeDiff(filemtime($this->viewPath)); // 获取最新同步修改时间
+        $filemtime = filemtime($this->viewPath);
+
+        touch($this->loadPath, $filemtime, $filemtime); // 更新缓存模板时间
 
     }
 
@@ -103,8 +116,21 @@ class Template
                 $path = str_replace('\\', DS, $path);
 
                 if (is_file($path)) {
-                    $file    = fopen($path, 'r');
-                    $content = fread($file, filesize($path));
+                    $file      = fopen($path, 'r');
+                    $content   = fread($file, filesize($path));
+                    $filemtime = filemtime($path);
+
+                    // 保存模板Include标签文件更新时间
+                    // $cacheTime = cache('template_include_cache_time');
+                    // $cacheTime = is_array($cacheTime) ? $cacheTime : [];
+
+                    // $cacheTime['view'][md5($this->viewPath)][md5($path)] = $filemtime;
+                    // $cacheTime['include'][md5($path)]                    = $path;
+                    // cache('template_include_cache_time', $cacheTime);
+
+                    // // 最新修改时间
+                    // $this->editTimeDiff(filemtime($path));
+
                     //替换模板变量
                     $this->content = str_replace($matches[0][$key], $content, $this->content);
                     // 循环模板
