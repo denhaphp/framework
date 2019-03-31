@@ -91,6 +91,7 @@ class BuildSql
         }
 
         $do->exec('set names ' . $config['charset']);
+        $do->exec('SET sql_mode =\'STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION\'');
 
         return $do;
 
@@ -575,7 +576,7 @@ class BuildSql
         foreach ($parseOrder as $key => $val) {
 
             // 包含 () 的关键字
-            if (stripos('(', $val) !== false) {
+            if (stripos($val, '(') !== false) {
                 $parseOrder[$key] = ' ' . $val;
             } else {
                 list($field, $exp) = explode(' ', $val);
@@ -704,7 +705,11 @@ class BuildSql
     public function getField($field = 'COLUMN_NAME')
     {
         $this->field($field);
-        $where              = ' WHERE table_name = \'' . $this->bulid['table'] . '\'';
+        $where = ' WHERE table_name = \'' . $this->bulid['table'] . '\'';
+        if ($this->bulid['group']) {
+            $where .= $this->bulid['group'];
+        }
+
         $this->bulid['sql'] = 'SELECT ' . $this->bulid['field'] . ' from information_schema.columns ' . $where;
         $result             = $this->query();
         $list               = $result->fetchAll(PDO::FETCH_ASSOC);
@@ -883,13 +888,9 @@ class BuildSql
     public function addAll($data = [])
     {
 
-        $this->startTrans();
-
         foreach ($data as $item) {
             $result = $this->add($item);
         }
-
-        $this->commit();
 
         return $result;
     }
@@ -952,19 +953,23 @@ class BuildSql
     public function query($sql = '')
     {
 
+        // 存入Sql Explain信息
+        if (!empty($this->config['sql_explain'])) {
+            $res = $this->link->query('explain ' . $this->bulid['sql']);
+            if ($res) {
+                $this->sqlInfo['explain'] = $res->fetchAll(PDO::FETCH_ASSOC);
+            }
+        }
+
         $_beginTime = microtime(true);
         $result     = $this->link->query($this->bulid['sql']);
         $_endTime   = microtime(true);
 
-        $this->sqlInfo['time'] = $_endTime - $_beginTime; //获取执行时间
+        $this->sqlInfo['time'] = $_endTime - $_beginTime; // 获取执行时间
         $this->sqlInfo['sql']  = $this->bulid['sql'];
 
         // 执行成功
         if ($result) {
-
-            if (!empty($this->config['sql_explain'])) {
-                $this->sqlInfo['explain'] = $this->link->query('explain ' . $this->bulid['sql'])->fetchAll(PDO::FETCH_ASSOC);
-            }
 
             // 存入调试信息中
             Trace::addSqlInfo($this->sqlInfo);
@@ -1038,18 +1043,26 @@ class BuildSql
         $info .= ' | ' . date('Y-m-d H:i:s', TIME);
         $info .= ' | ip:' . getIP();
         $info .= ' | Url:' . URL . '/' . Route::$uri;
-        $info .= PHP_EOL;
+        $info .= PHP_EOL . PHP_EOL;
 
         // 如果存在sql信息 并且开启日志记录
         if ($this->sqlInfo && $this->config['save_log']) {
             $basePath = DATA_SQL_PATH . $this->options['database'] . DS;
             is_dir($basePath) ? '' : mkdir($basePath, 0755, true);
+
             $content = $this->sqlInfo['sql'] . PHP_EOL;
 
-            $path = $basePath . isset($this->options['type']) ? strtolower($this->options['type']) : 'other';
+            // 记录explain
+            if ($this->config['sql_explain'] && isset($this->sqlInfo['explain'])) {
+                foreach ($this->sqlInfo['explain'] as $explain) {
+                    $content .= json_encode($explain) . PHP_EOL;
+                }
+            }
+
+            $path = $basePath . (isset($this->options['type']) ? strtolower($this->options['type']) : 'other');
             $path .= '_' . date('Y_m_d_H', TIME) . '.text';
 
-            //记录慢sql
+            // 记录慢sql
             if ($this->config['slow_log']) {
                 if ($this->sqlInfo['time'] > $this->config['slow_time']) {
                     $path = $basePath . 'slow_' . date('Y_m_d_H', TIME) . '.text';
