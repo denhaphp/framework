@@ -36,7 +36,7 @@ class Route
         //转换Url参数为GET参数
         $uriArr = explode('/s/', self::$uri);
         if (isset($uriArr[1])) {
-            self::changeGetValue($uriArr[1]);
+            self::changeGetValue($uriArr[1], ['isGet' => true]);
         }
 
         $routeArr = explode('/', ltrim(reset($uriArr), '/'));
@@ -233,13 +233,19 @@ class Route
 
     /**
      * 转换GET参数
-     * @date   2018-01-16T11:29:07+0800
+     * GET原始模式的参数优先级最高
+     * @date   2019-02-27T11:16:12+0800
      * @author ChenMingjiang
-     * @param  [type]                   $array [description]
-     * @return [type]                          [description]
+     * @param  [type]                   $uri     [description]
+     * @param  array                    $options [description]
+     *                                           isGet:是否保存GET值 默认不保存
+     * @return [type]                   [description]
      */
-    public static function changeGetValue($uri)
+    public static function changeGetValue($uri, $options = [])
     {
+
+        $isGet = isset($options['isGet']) ? isset($options['isGet']) : false;
+
         if (!$uri) {
             return false;
         }
@@ -257,18 +263,31 @@ class Route
                 // 匹配数组
                 $regular = '/(.*?)\[(.*?)\]/';
                 preg_match($regular, $paramItems[$i], $matches);
+
                 if ($matches) {
-                    // 保存数组信息
-                    if (!isset($_GET[$matches[1]][$matches[2]])) {
-                        $_GET[$matches[1]][$matches[2]] = urldecode($paramItems[$i + 1]);
-                    }
 
                     $result[$matches[1]][$matches[2]] = urldecode($paramItems[$i + 1]);
 
-                } else {
-                    $_GET[$paramItems[$i]] = urldecode($paramItems[$i + 1]);
+                    if ($isGet) {
+                        // 保存数组信息 如果不存在 $_GET 信息
+                        if (!isset($_GET[$matches[1]][$matches[2]])) {
+                            $_GET[$matches[1]][$matches[2]] = urldecode($paramItems[$i + 1]);
+                        }
 
+                        $result[$matches[1]][$matches[2]] = $_GET[$matches[1]][$matches[2]];
+                    }
+
+                } else {
                     $result[$paramItems[$i]] = urldecode($paramItems[$i + 1]);
+                    if ($isGet) {
+                        // 保存数组信息 如果不存在 $_GET 信息
+                        if (!isset($_GET[$paramItems[$i]])) {
+                            $_GET[$paramItems[$i]] = urldecode($paramItems[$i + 1]);
+                        }
+
+                        $result[$paramItems[$i]] = $_GET[$paramItems[$i]];
+                    }
+
                 }
             }
             $i += 2;
