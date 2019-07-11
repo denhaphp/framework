@@ -4,6 +4,8 @@
 //-------------------------
 namespace denha;
 
+use denha\Config;
+
 class Trace
 {
     private static $tracePageTabs  = ['BASE' => '基本', 'FILE' => '文件', 'ERR|NOTIC' => '错误', 'SQL' => 'SQL', 'DEBUG' => '调试'];
@@ -62,7 +64,7 @@ class Trace
             $info = $type . ' : ' . $message . ' from ' . $file . ' on ' . $line;
             self::addErrorInfo($info);
 
-            if (config('trace')) {
+            if (Config::get('trace')) {
                 $e = array(
                     'message' => $type . ' : ' . $message,
                     'file'    => $file,
@@ -74,7 +76,7 @@ class Trace
         }
     }
 
-    //捕获致命错误信息 并显示
+    // 捕获致命错误信息 并显示
     public static function catchError()
     {
         $e = error_get_last();
@@ -82,15 +84,34 @@ class Trace
 
             $debugContent = self::getFileContent($e['file'], $e['line']);
 
-            if (config('debug')) {
+            if (Config::get('error_log')) {
+
+                $path = DATA_RUN_PATH;
+                is_dir($path) ? '' : mkdir($path, 0755, true);
+
+                $path .= date('Y_m_d', TIME) . '.text';
+
+                $info = '------ ' . 'FATAL ERROR : ' . $e['message'] . ' from ' . $e['file'] . ' on line ' . $e['line'];
+                $info .= ' | ' . date('Y-m-d H:i:s', TIME);
+                $info .= ' | ip:' . Config::IP();
+                $info .= ' | Url:' . URL . '/' . Route::$uri;
+                $info .= PHP_EOL;
+
+                $content = $this->sqlInfo['sql'] . ';' . PHP_EOL . '--------------' . PHP_EOL;
+
+                error_log($content . $info, 3, $path);
+
+            }
+
+            if (Config::get('debug')) {
                 return include FARM_PATH . DS . 'trace' . DS . 'error.html';
             } else {
                 //FATAL ERROR 发送到邮箱
-                if (config('send_debug_mail')) {
-                    $title   = $_SERVER['HTTP_HOST'] . ' 有一个致命错误 ip:' . getIP() . ' ' . $_SERVER['SERVER_PROTOCOL'];
-                    $content = $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'] . PHP_EOL . 'FATAL ERROR : ' . $e['message'] . ' from ' . $e['file'] . ' on line ' . $e['line'];
-                    dao('Mail')->send(config('send_mail'), $title, $content);
-                }
+                // if (Config::get('send_debug_mail')) {
+                //     $title   = $_SERVER['HTTP_HOST'] . ' 有一个致命错误 ip:' . getIP() . ' ' . $_SERVER['SERVER_PROTOCOL'];
+                //     $content = $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'] . PHP_EOL . 'FATAL ERROR : ' . $e['message'] . ' from ' . $e['file'] . ' on line ' . $e['line'];
+                //     dao('Mail')->send(Config::get('send_mail'), $title, $content);
+                // }
 
                 header("http/1.1 404 not found");
                 header("status: 404 not found");
@@ -125,7 +146,7 @@ class Trace
             }
         }
 
-        if (config('trace')) {
+        if (Config::get('trace')) {
             return include FARM_PATH . DS . 'trace' . DS . 'error.html';
         } else {
             header("http/1.1 404 not found");
@@ -197,11 +218,11 @@ class Trace
     private static function baseInfo()
     {
 
-        $dbConfig = config('dbConfig', 'db');
+        $dbConfig = Config::includes('db.php')['dbInfo'];
         $dbName   = '';
-        foreach ($dbConfig as $key => $value) {
-            !isset($value['host']) ?: $dbName .= $value['host'] . ' : ';
-            !isset($value['name']) ?: $dbName .= $value['name'] . '  / ';
+        foreach ($dbConfig as $item) {
+            !isset($item['host']) ?: $dbName .= $item['host'] . ' : ';
+            !isset($item['name']) ?: $dbName .= $item['name'] . '  / ';
         }
 
         $base = [
