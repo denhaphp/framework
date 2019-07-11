@@ -1,8 +1,9 @@
  <?php
 
 use denha\Cache;
+use denha\Config;
+use denha\HttpResource;
 use denha\Route;
-use denha\Start;
 
 if (!function_exists('GSF')) {
     function GSF($array, $v)
@@ -148,26 +149,8 @@ if (!function_exists('config')) {
     function config($name = '', $path = '')
     {
 
-        $nameArr = explode('.', $name);
+        return Config::get($name, $path);
 
-        if ($path) {
-            $data = getConfig($path, $name);
-        } else {
-            if ($name && count($nameArr) == 1) {
-                $data = Start::$config[$name];
-            } elseif ($name && count($nameArr) > 1) {
-                $data = Start::$config[$nameArr[0]];
-                foreach ($nameArr as $key => $value) {
-                    if ($key) {
-                        $data = $data[$value];
-                    }
-                }
-            } else {
-                $data = Start::$config;
-            }
-        }
-
-        return $data;
     }
 }
 
@@ -184,7 +167,7 @@ if (!function_exists('cookie')) {
     function cookie($name = '', $value = '', $options = [])
     {
 
-        $config = array_merge(denha\Start::$config['cookie'], array_change_key_case((array) $options));
+        $config = array_merge(Config::get('cookie'), array_change_key_case((array) $options));
 
         if (!$name) {
             return false;
@@ -321,21 +304,8 @@ if (!function_exists('files')) {
      */
     function files($name)
     {
-        if (isset($_FILES[$name])) {
-            if (is_array($_FILES[$name]['name'])) {
-                foreach ($_FILES[$name] as $key => $value) {
-                    foreach ($value as $k => $v) {
-                        $data[$k][$key] = $v;
-                    }
-                }
-            } else {
-                $data = $_FILES[$name];
-            }
-        } else {
-            $data = null;
-        }
 
-        return $data;
+        return HttpResource::files($name);
     }
 }
 
@@ -344,63 +314,15 @@ if (!function_exists('filterParam')) {
      * 过滤参数
      * @date   2018-07-02T11:23:49+0800
      * @author ChenMingjiang
-     * @param  [type]                   $data    [description]
+     * @param  [type]                   $value   [description]
      * @param  [type]                   $type    [description]
      * @param  [type]                   $default [description]
      * @return [type]                            [description]
      */
-    function filterParam($data, $type = 'intval', $default = '')
+    function filterParam($value, $type = 'intval', $default = '')
     {
 
-        if (!is_array($data)) {
-            switch ($type) {
-                case 'intval':
-                    $data = $data === '' ? intval($default) : intval($data);
-                    break;
-                case 'float':
-                    $data = $data === '' ? floatval($default) : floatval($data);
-                    break;
-                case 'text':
-                    $data = $data === '' ? strval($default) : strval($data);
-                    break;
-                case 'trim':
-                    $data = $data === '' ? trim($default) : trim($data);
-                    break;
-                case 'bool':
-                    $data = $data === '' ? (bool) $default : (bool) $data;
-                    break;
-                case 'json':
-                    $data = $data === '' ? $default : json_decode($data, true);
-                    break;
-                case 'img':
-
-                    if (stripos($data, 'default') !== false) {
-                        $data = $default;
-                    } else {
-                        $imgArr = explode(',', $data);
-                        $data   = [];
-                        foreach ($imgArr as $img) {
-                            if (stripos($img, 'http') !== false || stripos($img, '/') !== false) {
-                                $data[] = pathinfo($img, PATHINFO_BASENAME);
-                            } else {
-                                $data[] = $img;
-                            }
-                        }
-                        $data = implode(',', $data);
-                    }
-                    break;
-                case 'time':
-                    if (stripos($data, '-') !== false) {
-                        $data = strtotime($data);
-                    }
-                    break;
-                default:
-                    # code...
-                    break;
-            }
-        }
-
-        return $data;
+        return HttpResource::filter($value, $type, $default);
     }
 }
 
@@ -416,31 +338,7 @@ if (!function_exists('get')) {
      */
     function get($name, $type = '', $default = '')
     {
-        $data = null;
-        if ($name == 'all') {
-            foreach ($_GET as $key => $val) {
-                if (!is_array($val)) {
-                    $val        = trim($val);
-                    $data[$key] = !get_magic_quotes_gpc() ? htmlspecialchars(addslashes($val), ENT_QUOTES, 'UTF-8') : htmlspecialchars($val, ENT_QUOTES, 'UTF-8');
-                } else {
-                    $data[$key] = $val;
-                }
-            }
-
-        } else {
-            //数组信息通过 xx.xxx 来获取
-            if (stripos($name, '.') !== false) {
-                $name = explode('.', $name);
-                $data = isset($_GET[$name[0]][$name[1]]) ? $_GET[$name[0]][$name[1]] : '';
-            } else {
-                $data = isset($_GET[$name]) ? $_GET[$name] : '';
-            }
-        }
-
-        if ($name != 'all' && !is_array($data)) {
-            $data = filterParam($data, $type, $default);
-        }
-        return $data;
+        return HttpResource::get($name, $type, $default);
     }
 }
 
@@ -486,41 +384,6 @@ if (!function_exists('getVar')) {
     }
 }
 
-if (!function_exists('getConfig')) {
-    /**
-     * 获取config下配置文档
-     * @date   2018-07-12T17:13:26+0800
-     * @author ChenMingjiang
-     * @param  string                   $path [路径]
-     * @param  string                   $name [文件名称]
-     * @return [type]                         [description]
-     */
-    function getConfig($path = 'config', $name = null)
-    {
-        static $_configData = [];
-
-        if (!isset($_configData[$path])) {
-
-            if (is_file(CONFIG_PATH . $path . '.php')) {
-                $_configData[$path] = include CONFIG_PATH . $path . '.php';
-            }
-
-        }
-
-        if (isset($_configData[$path])) {
-            if ($name === null) {
-                return $_configData[$path];
-            }
-
-            if (isset($_configData[$path][$name])) {
-                return $_configData[$path][$name];
-            }
-        }
-
-        return null;
-    }
-}
-
 if (!function_exists('getIP')) {
     /**
      * 获取真实IP地址
@@ -530,25 +393,20 @@ if (!function_exists('getIP')) {
      */
     function getIP()
     {
-        if (getenv('HTTP_CLIENT_IP')) {
-            $ip = getenv('HTTP_CLIENT_IP');
-        } elseif (getenv('HTTP_X_FORWARDED_FOR')) {
-            $ip = getenv('HTTP_X_FORWARDED_FOR');
-        } elseif (getenv('HTTP_X_FORWARDED')) {
-            $ip = getenv('HTTP_X_FORWARDED');
-        } elseif (getenv('HTTP_FORWARDED_FOR')) {
-            $ip = getenv('HTTP_FORWARDED_FOR');
-        } elseif (getenv('HTTP_FORWARDED')) {
-            $ip = getenv('HTTP_FORWARDED');
-        } else {
-            $ip = $_SERVER['REMOTE_ADDR'];
-        }
+        return Config::IP();
+    }
+}
 
-        // IP地址合法验证
-        $long = sprintf("%u", ip2long($ip));
-        $ip   = $long ? $ip : '0.0.0.1';
-
-        return $ip;
+if (!function_exists('getConfig')) {
+    /**
+     * 获取真实IP地址
+     * @date   2018-07-12T17:13:17+0800
+     * @author ChenMingjiang
+     * @return [type]                   [description]
+     */
+    function getConfig($path)
+    {
+        return Config::includes($path);
     }
 }
 
@@ -654,6 +512,15 @@ if (!function_exists('imgUrl')) {
                 $url = config('ststic') . '/default.png';
                 $url = !$host ? $url : $host . $url;
             } elseif ($size) {
+
+                if ($path) {
+                    $url = config('uploadfile') . $path . '/' . $imgName;
+                } else {
+                    $url = config('uploadfile') . $imgName;
+                }
+
+                $url = !$host ? $url : $host . $url;
+
                 $ext        = pathinfo($name, PATHINFO_EXTENSION);
                 $zipImgName = basename($name, '.' . $ext) . '_' . $size . '.' . $ext;
                 $url        = config('uploadfile') . 'zipimg/' . $zipImgName;
@@ -1087,31 +954,7 @@ if (!function_exists('post')) {
     function post($name, $type = '', $default = '')
     {
 
-        if ($name == 'all') {
-            foreach ($_POST as $key => $val) {
-                if (!is_array($val)) {
-                    $val        = trim($val);
-                    $data[$key] = !get_magic_quotes_gpc() ? htmlspecialchars(addslashes($val), ENT_QUOTES, 'UTF-8') : htmlspecialchars($val, ENT_QUOTES, 'UTF-8');
-                } else {
-                    $data[$key] = $val;
-                }
-            }
-
-        } else {
-            //数组信息通过 xx.xxx 来获取
-            if (stripos($name, '.') !== false) {
-                $name = explode('.', $name);
-                $data = isset($_POST[$name[0]][$name[1]]) ? $_POST[$name[0]][$name[1]] : '';
-            } else {
-                $data = isset($_POST[$name]) ? $_POST[$name] : '';
-            }
-        }
-
-        if ($name != 'all' && !is_array($data)) {
-            $data = filterParam($data, $type, $default);
-        }
-
-        return isset($data) ? $data : '';
+        return HttpResource::post($name, $type, $default);
     }
 }
 
@@ -1127,8 +970,8 @@ if (!function_exists('params')) {
      */
     function params($name, $type = '', $default = '')
     {
-        $data = get($name, $type, '');
-        if (!$data) {
+        $data = get($name, $type, null);
+        if ($data === null) {
             $data = post($name, $type, $default);
         }
 

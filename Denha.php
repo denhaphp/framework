@@ -13,6 +13,7 @@ define('DATA_PATH', ROOT_PATH . 'data' . DS); // 缓存目录
 define('DATA_CACHE_PATH', DATA_PATH . 'cache' . DS); // 缓存文件目录
 define('DATA_TPL_PATH', DATA_PATH . 'tpl' . DS); // 缓存模板目录
 define('DATA_SQL_PATH', DATA_PATH . 'sqlLog' . DS); // 数据库日志记录目录
+define('DATA_RUN_PATH', DATA_PATH . 'runLog' . DS); // 程序运行日志记录目录
 define('VIEW_PATH', ROOT_PATH . 'resources' . DS); // 资源目录
 define('PUBLIC_PATH', ROOT_PATH . 'public' . DS); // 公共地址目录
 define('EXT', '.php'); //文件后缀
@@ -31,6 +32,12 @@ if (!IS_CLI) {
     define('IS_PUT', REQUEST_METHOD == 'PUT' ? true : false);
     define('IS_DELETE', REQUEST_METHOD == 'DELETE' ? true : false);
     define('IS_AJAX', (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && (strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest')) || !empty($_POST['ajax']) || !empty($_GET['ajax']) ? true : false);
+} else {
+    define('IS_GET', false);
+    define('IS_POST', false);
+    define('IS_PUT', false);
+    define('IS_DELETE', false);
+    define('IS_AJAX', false);
 }
 
 define('TIME', $_SERVER['REQUEST_TIME']); //系统时间
