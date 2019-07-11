@@ -29,7 +29,7 @@ class Template
         //{$xxx} be echo $xxx;
         $this->content = preg_replace('/' . $this->left . '\$(.*?)' . $this->right . '/is', '<?php echo $\1; ?>', $this->content);
         //{default:$xxx|"xxx"}
-        $this->content = preg_replace('/' . $this->left . 'default:\$(.*?)[|](.*?)' . $this->right . '/is', '<?php echo isset($\1) ? $\1 : \2 ; ?>', $this->content);
+        $this->content = preg_replace('/' . $this->left . 'default:(.*?)[|](.*?)' . $this->right . '/is', '<?php echo !empty(\1) ? \1 : \2 ; ?>', $this->content);
         //??$xx  be !isset($xx) ?: $xx
         $this->content = preg_replace('/' . $this->left . '\?\?(.*?)' . $this->right . '/is', '<?php echo !isset(\1) ? null : \1; ?>', $this->content);
         //机器翻译标签 {FY:xxx:en}
@@ -84,6 +84,7 @@ class Template
         $cacheMd5       = md5($this->viewPath);
         $this->loadPath = DATA_TPL_PATH . $cacheMd5 . '.php';
         $file           = fopen($this->loadPath, 'w');
+
         fwrite($file, $this->content);
         fclose($file);
 
