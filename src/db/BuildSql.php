@@ -5,6 +5,7 @@
 namespace denha\db;
 
 use denha;
+use denha\Config;
 use denha\Route;
 use denha\Trace;
 use \Exception;
@@ -44,7 +45,7 @@ class BuildSql
         if ($dbConfig) {
             self::$dbConfig = $dbConfig;
         } else {
-            self::$dbConfig = config('dbConfig', 'db');
+            self::$dbConfig = Config::includes('db.php')['dbInfo'];
         }
 
         foreach (self::$dbConfig as $key => $value) {
@@ -52,7 +53,6 @@ class BuildSql
             if (!isset(self::$do[$hash])) {
                 self::$do[$hash] = $this->open($value);
             }
-
         }
     }
 
@@ -77,6 +77,7 @@ class BuildSql
     /** 打开数据库链接 */
     public function open($config)
     {
+
         $config['user'] = isset($config['user']) ? $config['user'] : '';
         $config['pwd']  = isset($config['pwd']) ? $config['pwd'] : '';
 
@@ -84,8 +85,10 @@ class BuildSql
             $do = new PDO($this->parseDNS($config), $config['user'], $config['pwd']);
         } catch (\PDOException $e) {
             $msg = $e->getMessage() . ' <br/>SQL Config:<br/>' . PHP_EOL;
-            foreach ($config as $key => $value) {
-                $msg .= $key . ' : <font style="color:red">' . $value . '</font><br/>' . PHP_EOL;
+            if (Config::get('debug')) {
+                foreach ($config as $key => $value) {
+                    $msg .= $key . ' : <font style="color:red">' . $value . '</font><br/>' . PHP_EOL;
+                }
             }
             throw new Exception($msg);
         }
@@ -171,8 +174,7 @@ class BuildSql
     public function table($table, $options = [])
     {
 
-        $isTablepre = isset($options['is_tablepre']) ? $options['is_tablepre'] : true;
-        $link       = isset($options['link']) ? $options['link'] : '';
+        $link = isset($options['link']) ? $options['link'] : '';
 
         // 初始化SQL参数
         $this->init();
@@ -182,22 +184,43 @@ class BuildSql
             $this->connect($link);
         }
 
-        $this->table = parseName($table);
-        if ($isTablepre && $this->options['tablepre']) {
-            $this->options['table'] = [
-                'name'        => $this->options['tablepre'] . parseName($table),
-                'is_tablepre' => $isTablepre,
-            ];
-        } else {
-            $this->options['table'] = [
-                'name'        => parseName($table),
-                'is_tablepre' => $isTablepre,
-            ];
-        }
-
-        $this->bulid['table'] = $this->options['table']['name'];
+        $this->parseTable($table, $options); // 解析table
 
         return $this;
+    }
+
+    public function parseTable($table, $options = [])
+    {
+        $isTablepre = isset($options['is_tablepre']) ? $options['is_tablepre'] : true;
+
+        // 判断是否存在 as
+        if (stripos($table, ' as ') !== false) {
+            list($tableName, $tableAs) = explode(' AS ', str_replace(' as ', ' AS ', $table));
+        } else {
+            $tableName = $table;
+        }
+
+        $tableName = parseName(trim($tableName));
+        $tableAs   = isset($tableAs) ? trim($tableAs) : '';
+
+        $options['name']        = $isTablepre && $this->options['tablepre'] ? $this->options['tablepre'] . $tableName : $tableName;
+        $options['is_tablepre'] = $isTablepre;
+        $options['as']          = $tableAs;
+
+        if ($tableAs) {
+            $bulid = $options['name'] . ' AS ' . $tableAs;
+        } else {
+            $bulid = $options['name'];
+        }
+
+        // 保证 $this->options['table'] 唯一
+        if (empty($this->options['table'])) {
+            $this->options['table'] = $options;
+            $this->bulid['table']   = $bulid;
+        }
+
+        return $bulid;
+
     }
 
     /**
@@ -222,6 +245,10 @@ class BuildSql
     {
         if (
             stripos($field, '`') === false
+            && stripos($field, ' ') === false
+            && stripos($field, '>') === false
+            && stripos($field, '=') === false
+            && stripos($field, '<') === false
             && stripos($field, '_STRING') === false
             && stripos($field, '*') === false
             && stripos($field, 'CONCAT') === false
@@ -434,6 +461,8 @@ class BuildSql
         if ($table == $this->options['table']['name']) {
             throw new Exception('表与关联表名字相同');
         }
+
+        $table = $this->parseTable($table, ['is_tablepre' => false]);
 
         $where ?: $where = $this->options['table']['name'] . '.id = ' . $table . '.id';
 
@@ -652,7 +681,7 @@ class BuildSql
     {
         $this->options['type'] = $type;
 
-        if (!$this->bulid['table']) {
+        if (empty($this->bulid['table'])) {
             throw new Exception('请选择数据表');
         }
 
@@ -754,6 +783,7 @@ class BuildSql
 
     /**
      * 获取单个字段列表
+     * 如果field是两个字段 则首字段为value 尾字段为key
      * @date   2018-07-12T14:41:02+0800
      * @author ChenMingjiang
      * @param  [type]                   $field [description]
@@ -985,11 +1015,12 @@ class BuildSql
                 $this->addErrorSqlLog();
             }
 
-            if (config('debug')) {
-                throw new Exception('SQL ERROR : ' . $this->bulid['sql']);
+            if (Config::get('debug')) {
+                list($errorCode, $errorNumber, $errorMsg) = $this->link->errorInfo();
+                throw new Exception('[<font color="red">SQL ERROR :' . $errorCode . ' ' . $errorMsg . ' </font>] SQL :  ' . $this->bulid['sql']);
             }
 
-            if (config('trace')) {
+            if (Config::get('trace')) {
                 Trace::addErrorInfo('[SQL ERROR] ' . $this->bulid['sql']);
             }
 
@@ -1008,15 +1039,15 @@ class BuildSql
             $path = DATA_SQL_PATH . $this->options['database'] . DS;
             is_dir($path) ? '' : mkdir($path, 0755, true);
 
-            $path .= 'error_' . date('Y_m_d_H', TIME) . '.text';
+            $path .= 'error_' . date('Y_m_d', TIME) . '.text';
 
             $info = '------ ' . $this->sqlInfo['time'];
             $info .= ' | ' . date('Y-m-d H:i:s', TIME);
-            $info .= ' | ip:' . getIP();
+            $info .= ' | ip:' . Config::IP();
             $info .= ' | Url:' . URL . '/' . Route::$uri;
             $info .= PHP_EOL;
 
-            $content = $this->sqlInfo['sql'] . ';' . PHP_EOL . '来源：' . $_SERVER['HTTP_USER_AGENT'] . PHP_EOL . '--------------' . PHP_EOL;
+            $content = $this->sqlInfo['sql'] . ';' . PHP_EOL . '--------------' . PHP_EOL;
 
             error_log($content . $info, 3, $path);
 
@@ -1041,7 +1072,7 @@ class BuildSql
 
         $info = '------ ' . $this->sqlInfo['time'];
         $info .= ' | ' . date('Y-m-d H:i:s', TIME);
-        $info .= ' | ip:' . getIP();
+        $info .= ' | ip:' . Config::IP();
         $info .= ' | Url:' . URL . '/' . Route::$uri;
         $info .= PHP_EOL . PHP_EOL;
 
@@ -1060,12 +1091,12 @@ class BuildSql
             }
 
             $path = $basePath . (isset($this->options['type']) ? strtolower($this->options['type']) : 'other');
-            $path .= '_' . date('Y_m_d_H', TIME) . '.text';
+            $path .= '_' . date('Y_m_d', TIME) . '.text';
 
             // 记录慢sql
             if ($this->config['slow_log']) {
                 if ($this->sqlInfo['time'] > $this->config['slow_time']) {
-                    $path = $basePath . 'slow_' . date('Y_m_d_H', TIME) . '.text';
+                    $path = $basePath . 'slow_' . date('Y_m_d', TIME) . '.text';
                 }
             }
 
