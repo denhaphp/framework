@@ -207,9 +207,17 @@ class Route
     {
         //去除urldecode转码 转码会导致get参数 带/解析错误
         // $uri = urldecode($_SERVER['REQUEST_URI']);
-        $uri = $_SERVER['REQUEST_URI'];
-        if (strpos($uri, $_SERVER['SCRIPT_NAME']) === 0) {
-            $uri = substr($uri, strlen($_SERVER['SCRIPT_NAME']));
+
+        if (isset($_SERVER['REQUEST_URI'])) {
+            $uri = $_SERVER['REQUEST_URI'];
+        } elseif (isset($_SERVER['argv'][1])) {
+            $uri = $_SERVER['argv'][1];
+        }
+
+        if (!empty($_SERVER['SCRIPT_NAME'])) {
+            if (strpos($uri, $_SERVER['SCRIPT_NAME']) === 0) {
+                $uri = substr($uri, strlen($_SERVER['SCRIPT_NAME']));
+            }
         }
 
         // 删除"/"
