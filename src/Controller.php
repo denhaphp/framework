@@ -33,6 +33,8 @@ class Controller
      * @param  string                   $viewPath       [视图地址]
      * @param  array                    $viewParamData  [渲染变量值]
      * @param  array                    $options        [预定义参数]
+     *                                                  trace:单个视图关闭调试模式 【默认】true：开启 fasle：关闭
+     *                                                  peg：自定义路径
      * @return [type]                                   [description]
      */
     protected function show($viewPath = '', $viewParamData = [], $options = [])
@@ -188,8 +190,8 @@ class Controller
             $debug = [
                 'debug' => [
                     'param' => [
-                        'post'  => (array) post('all'),
-                        'get'   => (array) get('all'),
+                        'post'  => (array) post(),
+                        'get'   => (array) get(),
                         'files' => $_FILES,
                     ],
                     'ip'    => getIP(),
@@ -234,8 +236,8 @@ class Controller
             $debug = array(
                 'debug' => [
                     'param' => [
-                        'post'  => (array) post('all'),
-                        'get'   => (array) get('all'),
+                        'post'  => (array) post(),
+                        'get'   => (array) get(),
                         'files' => $_FILES,
                     ],
                     'ip'    => getIP(),
