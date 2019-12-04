@@ -17,8 +17,9 @@ class Config
      * @param  string                   $path [默认空则获取系统配置]
      * @return [type]                   [description]
      */
-    public static function get($name = '', $path = null)
+    public static function get($name = null, $path = null)
     {
+
         $key = md5($name . $path);
 
         if (!isset(self::$names[$key])) {

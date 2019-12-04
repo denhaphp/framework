@@ -14,23 +14,26 @@ use \PDO;
 class BuildSql
 {
 
-    public static $dbConfig;
-    public static $instance; // 单例实例化;
-    public static $do; // 数据库操作符
-    public $id; // 当前链接配置ID
-    public $link; // 当前链接符
-    public $options; // 记录参数信息
-    public $bulid; // 记录构造Sql;
-    public $config; //
+    private static $dbConfig;
+    private static $instance; // 单例实例化;
+    private static $do; // 数据库操作符
 
-    private function __construct($dbConfig = '')
+    public static $link; // 当前链接符
+    public static $id; // 当前链接配置ID
+
+    public $options; // 记录参数信息$
+    public $bulid; // 记录构造Sql;
+
+    private $config; //
+
+    private function __construct(array $dbConfig = [])
     {
         $this->config($dbConfig);
 
     }
 
-    //单例实例化 避免重复New暂用资源
-    public static function getInstance($dbConfig = '')
+    // 单例实例化 避免重复New占用资源
+    public static function getInstance(array $dbConfig = [])
     {
         if (is_null(self::$instance)) {
             self::$instance = new BuildSql($dbConfig);
@@ -40,7 +43,7 @@ class BuildSql
 
     }
 
-    public function config($dbConfig = [])
+    public function config(array $dbConfig = []): void
     {
         if ($dbConfig) {
             self::$dbConfig = $dbConfig;
@@ -56,12 +59,12 @@ class BuildSql
         }
     }
 
-    public function parseDNS($config)
+    public function parseDNS(array $config): string
     {
         switch ($config['type']) {
             case 'mysql':
             case 'mysqli':
-                $dns = 'mysql:host=' . $config['host'] . ';dbname=' . $config['name'];
+                $dns = 'mysql:host=' . $config['host'] . ':' . $config['port'] . ';dbname=' . $config['name'] . ';charset=' . $config['charset'];
                 break;
             case 'sqlite':
                 $dns = 'sqlite:' . $config['name'];
@@ -75,7 +78,7 @@ class BuildSql
     }
 
     /** 打开数据库链接 */
-    public function open($config)
+    public function open(array $config)
     {
 
         $config['user'] = isset($config['user']) ? $config['user'] : '';
@@ -93,27 +96,29 @@ class BuildSql
             throw new Exception($msg);
         }
 
-        $do->exec('set names ' . $config['charset']);
+        // $do->exec('set interactive_timeout=24*3600,wait_timeout=24*3600');
         $do->exec('SET sql_mode =\'STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION\'');
+        $do->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true); // true:客户端查询缓存 false:服务器查询缓存
+        $do->setAttribute(PDO::ATTR_PERSISTENT, true); // 持久化连接
 
         return $do;
 
     }
 
     /** 获取最后执行SQL */
-    public function getLastSql()
+    public function getLastSql(): string
     {
 
         return $this->sqlInfo['sql'];
     }
 
     /** 链接 */
-    public function connect($id = 0)
-    {
-        $this->id   = $id;
-        $this->link = self::$do[md5(json_encode(self::$dbConfig[$id]))];
+    public function connect(int $id = 0)
+    {   
+        self::$id   = $id;
+        self::$link = self::$do[md5(json_encode(self::$dbConfig[$id]))];
 
-        if (!$this->link) {
+        if (!self::$link->getAttribute(PDO::ATTR_SERVER_INFO)) {
             throw new Exception('链接信息异常');
         }
 
@@ -126,7 +131,7 @@ class BuildSql
     }
 
     /** 构造Sql初始化 */
-    public function init()
+    public function init(): void
     {
 
         $this->bulid = [
@@ -154,7 +159,7 @@ class BuildSql
      * @param  boolean                  $value [true：开启子查询 false:关闭子查询]
      * @return [type]                          [description]
      */
-    public function childSql($bool = false)
+    public function childSql(bool $bool = false)
     {
         $this->bulid['chilidSql'] = $bool;
 
@@ -171,7 +176,7 @@ class BuildSql
      *                                  link：链接数据库配置ID
      * @return [type]                            [description]
      */
-    public function table($table, $options = [])
+    public function table(string $table, array $options = [])
     {
 
         $link = isset($options['link']) ? $options['link'] : '';
@@ -189,7 +194,7 @@ class BuildSql
         return $this;
     }
 
-    public function parseTable($table, $options = [])
+    public function parseTable($table, $options = []): string
     {
         $isTablepre = isset($options['is_tablepre']) ? $options['is_tablepre'] : true;
 
@@ -230,7 +235,7 @@ class BuildSql
      * @param  [type]                   $table [description]
      * @return [type]                          [description]
      */
-    public function getTableName()
+    public function getTableName(): string
     {
         return $this->bulid['table'];
     }
@@ -241,7 +246,7 @@ class BuildSql
      * @author ChenMingjiang
      * @param  [type]                   $field [description]
      */
-    private function addFieldTag($field)
+    private function addFieldTag(string $field): string
     {
         if (
             stripos($field, '`') === false
@@ -265,83 +270,11 @@ class BuildSql
         return $field;
     }
 
-    /**
-     * 查询条件
-     * @date   2018-06-29T15:50:51+0800
-     * @author ChenMingjiang
-     * @param  [type]                   $where [description]
-     * @param  [type]                   $value [description]
-     * @param  [type]                   $exp   [description]
-     * @return [type]                          [description]
-     */
-    public function where($where, $value = null, $exp = null)
-    {
-
-        if (!$where) {
-            return $this;
-        }
-
-        // 存在三个参数 $exp => 参数值
-        if ($value !== null && $exp !== null) {
-            $map[$where] = [$value, $exp];
-            $where       = $map;
-
-        }
-        // 存在两个参数
-        elseif ($value !== null && $exp === null) {
-
-            if (is_array($value)) {
-                throw new Exception("SQL Where 参数值错误 {$where} = `数组`");
-            }
-
-            $map[$where] = $value;
-            $where       = $map;
-        }
-
-        // 批量处理数组
-        if (is_array($where)) {
-            foreach ($where as $mapField => $v) {
-
-                // 格式化字段
-                $mapField = $this->addFieldTag($mapField);
-
-                if (is_array($v)) {
-                    list($mapExp, $mapValue) = $v;
-                } elseif ($mapField == '_string') {
-                    $mapExp   = '_string';
-                    $mapValue = $v;
-                } else {
-                    $mapExp   = '=';
-                    $mapValue = $v;
-                }
-
-                // 解析map
-                $this->options['map'][] = $whereMap[] = $this->parseMap($mapField, $mapExp, $mapValue);
-            }
-
-            $newWhere = $this->parseWhere($whereMap);
-
-        }
-        // 单条where语句
-        else {
-            //记录条件参数
-            $this->options['map'][] = $where;
-        }
-
-        if (!empty($newWhere)) {
-            if (!isset($this->bulid['where'])) {
-                $this->bulid['where'] = ' WHERE ' . substr($newWhere, 5);
-            } else {
-                $this->bulid['where'] .= $newWhere;
-            }
-        }
-
-        return $this;
-    }
-
     /** 解析查询条件 */
-    public function parseWhere($whereMap)
+    public function parseWhere(array $whereMap = []): string
     {
+        $whereMap = $whereMap ? $whereMap : $this->options['map'];
+
         if (count($whereMap) > 1) {
             // 第一个OR出现
             $orStart = true;
@@ -372,17 +305,97 @@ class BuildSql
             }
         }
 
-        $map = '';
-        foreach ($whereMap as $vv) {
-            $map .= $vv[1] . $vv[0];
+        $mapSql = ' WHERE ';
+        foreach ($whereMap as $key => $item) {
+
+            list($field, $link) = $item;
+            // if (array_key_last($whereMap) == $key) { PHP >= 7.3
+            // PHP <= 7.3
+            if (count($whereMap) - 1 == $key) {
+
+                $mapSql .= $field;
+            } else {
+                $mapSql .= $field . $link;
+            }
         }
 
-        return $map;
+        return $mapSql;
+    }
+
+    /**
+     * 查询条件
+     * @date   2019-09-29T16:49:48+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $where   [description]
+     * @param  [type]                   $value   [description]
+     * @param  [type]                   $exp     [description]
+     * @param  string                   $mapLink [链接符 AND OR]
+     * @return [type]                   [description]
+     */
+    public function where($where, $value = null, $exp = null, $mapLink = 'AND')
+    {
+
+        if (!$where) {
+            return $this;
+        }
+
+        // 存在三个参数 $exp => 参数值
+        if ($value !== null && $exp !== null) {
+            $map[$where] = [$value, $exp];
+            $where       = $map;
+
+        }
+        // 存在两个参数
+        elseif ($value !== null && $exp === null) {
+            if (is_array($value)) {
+                throw new Exception("SQL Where 参数值错误 {$where} = `数组`");
+            }
+
+            $map[$where] = $value;
+            $where       = $map;
+        }
+
+        // 批量处理数组
+        if (is_array($where)) {
+            foreach ($where as $mapField => $v) {
+                // 格式化字段
+                $mapField = $this->addFieldTag($mapField);
+                // 初始化连接符
+                $mapLink = 'AND';
+
+                // 数组3个参数
+                if (is_array($v) && count($v) == 2) {
+                    list($mapExp, $mapValue) = $v;
+                }
+                // 数组3个参数
+                elseif (is_array($v) && count($v) == 3) {
+                    list($mapExp, $mapValue, $mapLink) = $v;
+                } elseif ($mapField == '_string') {
+                    $mapExp   = '_string';
+                    $mapValue = $v;
+                } else {
+                    $mapExp   = '=';
+                    $mapValue = $v;
+                }
+
+                // 解析map
+                $this->parseMap($mapField, $mapExp, $mapValue, $mapLink);
+            }
+
+        }
+        // 单条where语句
+        else {
+            //记录条件参数
+            $this->options['map'][] = [$where, $mapLink];
+        }
+
+        return $this;
     }
 
     /** 处理查询条件 */
-    public function parseMap($mapField, $mapExp, $mapValue, $mapLink = 'AND')
+    public function parseMap($mapField, $mapExp, $mapValue, $mapLink = 'AND'): array
     {
+
         $mapLink = ' ' . $mapLink . ' '; // 连接符
         $expRule = [
             ['>', '<', '>=', '<=', '!=', 'like', '<>', '='],
@@ -438,10 +451,21 @@ class BuildSql
         }
         // 'find_in_set', 'FIND_IN_SET'
         elseif (in_array($mapExp, $expRule[6])) {
-            $map = $mapExp . '(' . $mapValue . ', ' . $mapField . ')';
+            $mapValue = explode(',', $mapValue);
+            $mapArs   = [];
+            foreach ($mapValue as $value) {
+                $mapArs[] = $map = $mapExp . '(' . $value . ', ' . $mapField . ')';
+
+                $this->options['map'][] = [$map, $mapLink];
+            }
+
+            return [implode($mapLink, $mapArs), $mapLink];
         } else {
             throw new Exception('SQL WHERE 参数错误 `' . $mapExp . '`');
         }
+
+        $this->options['map'][] = [$map, $mapLink];
+
         return [$map, $mapLink];
     }
 
@@ -455,7 +479,7 @@ class BuildSql
      * @param  array                    $options [description]
      * @return [type]                            [description]
      */
-    public function join($table, $where = '', $float = 'left')
+    public function join(string $table, $where = '', $float = 'left')
     {
 
         if ($table == $this->options['table']['name']) {
@@ -484,7 +508,7 @@ class BuildSql
      * @param  [type]                   $limit [description]
      * @return [type]                          [description]
      */
-    public function limit($limit = 0, $pageSize = '')
+    public function limit(int $limit = 0, $pageSize = '')
     {
         $this->bulid['limit'] = ' LIMIT ' . $limit;
         if ($pageSize) {
@@ -650,7 +674,7 @@ class BuildSql
      * @param  boolean                  $value [description]
      * @return [type]                          [description]
      */
-    public function getSql($bool = true)
+    public function getSql(bool $bool = true)
     {
         $this->options['childSql'] = $bool;
 
@@ -669,7 +693,7 @@ class BuildSql
      * @param  [type]                   $table [description]
      * @return [type]                          [description]
      */
-    public function childSqlQuery($table)
+    public function childSqlQuery(string $table)
     {
         $this->bulid['table'] = '(' . $table . ') as child';
 
@@ -677,7 +701,7 @@ class BuildSql
     }
 
     /** 构建SQL语句 */
-    public function bulidSql($type = 'SELECT')
+    public function bulidSql(string $type = 'SELECT'): void
     {
         $this->options['type'] = $type;
 
@@ -698,7 +722,9 @@ class BuildSql
         }
 
         empty($this->bulid['join']) ?: $this->bulid['sql'] .= $this->bulid['join'];
-        empty($this->bulid['where']) ?: $this->bulid['sql'] .= $this->bulid['where'];
+
+        empty($this->options['map']) ?: $this->bulid['sql'] .= $this->parseWhere();
+
         empty($this->bulid['group']) ?: $this->bulid['sql'] .= $this->bulid['group'];
         empty($this->bulid['having']) ?: $this->bulid['sql'] .= $this->bulid['having'];
         empty($this->bulid['order']) ?: $this->bulid['sql'] .= $this->bulid['order'];
@@ -761,7 +787,7 @@ class BuildSql
      * @param  [type]                   $field [description]
      * @return [type]                          [description]
      */
-    public function value($field = '')
+    public function value(string $field = '')
     {
 
         if ($field) {
@@ -905,7 +931,7 @@ class BuildSql
 
         $this->bulidSql('INSERT');
         $result = $this->query();
-        $id     = $this->link->lastInsertId();
+        $id     = self::$link->lastInsertId();
 
         return $id;
     }
@@ -941,7 +967,7 @@ class BuildSql
     public function delete()
     {
 
-        if (empty($this->bulid['where'])) {
+        if (empty($this->options['map'])) {
             throw new Exception('SQL ERROR : 禁止全表删除');
         }
 
@@ -955,21 +981,21 @@ class BuildSql
     // 开启事务
     public function startTrans()
     {
-        $this->link->beginTransaction();
+        self::$link->beginTransaction();
         return true;
     }
 
     // 回滚事务
     public function rollback()
     {
-        $this->link->rollBack();
+        self::$link->rollBack();
         return true;
     }
 
     // 提交事务
     public function commit()
     {
-        $this->link->commit();
+        self::$link->commit();
         return true;
     }
 
@@ -985,14 +1011,14 @@ class BuildSql
 
         // 存入Sql Explain信息
         if (!empty($this->config['sql_explain'])) {
-            $res = $this->link->query('explain ' . $this->bulid['sql']);
+            $res = self::$link->query('explain ' . $this->bulid['sql']);
             if ($res) {
                 $this->sqlInfo['explain'] = $res->fetchAll(PDO::FETCH_ASSOC);
             }
         }
 
         $_beginTime = microtime(true);
-        $result     = $this->link->query($this->bulid['sql']);
+        $result     = self::$link->query($this->bulid['sql']);
         $_endTime   = microtime(true);
 
         $this->sqlInfo['time'] = $_endTime - $_beginTime; // 获取执行时间
@@ -1010,18 +1036,20 @@ class BuildSql
 
             return $result;
         } else {
+
             // 存入文件
             if ($this->config['error_log']) {
                 $this->addErrorSqlLog();
             }
 
             if (Config::get('debug')) {
-                list($errorCode, $errorNumber, $errorMsg) = $this->link->errorInfo();
-                throw new Exception('[<font color="red">SQL ERROR :' . $errorCode . ' ' . $errorMsg . ' </font>] SQL :  ' . $this->bulid['sql']);
+                list($errorCode, $errorNumber, $errorMsg) = self::$link->errorInfo();
+                throw new Exception('[<font color="red">SQL ERROR :' . $errorCode . ' ' . $errorMsg . ' </font>] SQL :  ' . $this->bulid['sql'] . PHP_EOL);
             }
 
             if (Config::get('trace')) {
                 Trace::addErrorInfo('[SQL ERROR] ' . $this->bulid['sql']);
+
             }
 
             return false;

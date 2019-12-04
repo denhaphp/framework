@@ -9,6 +9,7 @@ define('VENDOR_PATH', ROOT_PATH . 'vendor' . DS); // Composer插件目录
 define('FARM_PATH', VENDOR_PATH . 'denha' . DS . 'framework' . DS . 'src' . DS); //框架根目录
 define('APP_PATH', ROOT_PATH . 'appliaction' . DS); // 程序根目录
 define('CONFIG_PATH', ROOT_PATH . 'conf' . DS); // 配置文档目录
+define('CERT_PATH', ROOT_PATH . 'cert' . DS); // 证书文档目录
 define('DATA_PATH', ROOT_PATH . 'data' . DS); // 缓存目录
 define('DATA_CACHE_PATH', DATA_PATH . 'cache' . DS); // 缓存文件目录
 define('DATA_TPL_PATH', DATA_PATH . 'tpl' . DS); // 缓存模板目录

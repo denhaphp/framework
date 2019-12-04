@@ -12,11 +12,34 @@ class HttpResource
     {
         if (!self::$request) {
             self::$request['service']         = $_SERVER;
+            self::$request['method']          = self::method();
             self::$request['params']['get']   = self::get();
             self::$request['params']['post']  = self::post();
             self::$request['params']['put']   = self::put();
             self::$request['params']['files'] = self::files();
         }
+    }
+
+    public function getRequest()
+    {
+        return self::$request;
+    }
+
+    public static function method()
+    {
+
+        if (PHP_SAPI == 'cli') {
+            $method = 'CLI';
+        }
+        // elseif ((isset($_SERVER['HTTP_X_REQUESTED_WITH']) && (strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest')) || !empty($_POST['ajax']) || !empty($_GET['ajax'])) {
+        //     $method = 'AJAX';
+        // }
+        else {
+            $method = $_SERVER['REQUEST_METHOD'];
+        }
+
+        return $method;
+
     }
 
     public static function get($name = null, $type = '', $default = '')
@@ -42,7 +65,7 @@ class HttpResource
             }
         }
 
-        if ($name && !is_array($data)) {
+        if ($name) {
             $data = self::filter($data, $type, $default);
         }
         return $data;
@@ -89,7 +112,7 @@ class HttpResource
      * @param  string                   $default [description]
      * @return [type]                            [description]
      */
-    public static function put($name, $type = '', $default = '')
+    public static function put($name = null, $type = '', $default = '')
     {
         // if (!post($name, $type, $default)) {
         //     parse_str(file_get_contents('php://input'), $_POST);
@@ -128,7 +151,7 @@ class HttpResource
             }
         }
 
-        if ($name && !is_array($data)) {
+        if ($name) {
             $data = self::filter($data, $type, $default);
         }
 
@@ -136,63 +159,122 @@ class HttpResource
     }
 
     /**
-     * 过滤参数
-     * @date   2018-07-02T11:23:49+0800
+     * 过滤数据
+     * @date   2019-08-30T11:18:46+0800
      * @author ChenMingjiang
      * @param  [type]                   $data    [值]
-     * @param  [type]                   $type    [类型]
-     * @param  [type]                   $default [默认值]
-     * @return [type]                            [description]
+     * @param  string                   $type    [类型 intval:整型 float:浮点型 text:文本类型 trim:清空两边空白 bool:布尔类型 json:解析json implode:分割数组 img:图片类型 time:文本时间类型转时间戳 同一数据多种分割通过"."拼接按顺序执行]
+     * @param  string                   $default [默认值]
+     * @return [type]                   [description]
      */
-    public static function filter($data, $type = 'intval', $default = '')
+    public static function filter($data, $types = 'intval', $default = '')
+    {
+        $types = explode('.', $types);
+        foreach ($types as $type) {
+            $data = self::parseFilter($data, $type, $default);
+        }
+
+        return $data;
+    }
+
+    /**
+     * 过滤数据
+     * @date   2019-08-30T11:18:46+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $data    [值]
+     * @param  string                   $type    [类型 intval:整型 float:浮点型 text:文本类型 trim:清空两边空白 bool:布尔类型 json:解析json implode:分割数组 img:图片类型 time:文本时间类型转时间戳]
+     * @param  string                   $default [默认值]
+     * @return [type]                   [description]
+     */
+    public static function parseFilter($data, $type = 'intval', $default = '')
     {
 
-        if (!is_array($data)) {
-            switch ($type) {
-                case 'intval':
-                    $data = $data === '' ? intval($default) : intval($data);
-                    break;
-                case 'float':
-                    $data = $data === '' ? floatval($default) : floatval($data);
-                    break;
-                case 'text':
-                    $data = $data === '' ? strval($default) : strval($data);
-                    break;
-                case 'trim':
-                    $data = $data === '' ? trim($default) : trim($data);
-                    break;
-                case 'bool':
-                    $data = $data === '' ? (bool) $default : (bool) $data;
-                    break;
-                case 'json':
-                    $data = $data === '' ? $default : json_decode($data, true);
-                    break;
-                case 'img':
-
-                    if (stripos($data, 'default') !== false) {
-                        $data = $default;
-                    } else {
-                        $imgArr = explode(',', $data);
-                        $data   = [];
-                        foreach ($imgArr as $img) {
-                            if (stripos($img, 'http') !== false || stripos($img, '/') !== false) {
-                                $data[] = pathinfo($img, PATHINFO_BASENAME);
-                            } else {
-                                $data[] = $img;
-                            }
-                        }
-                        $data = implode(',', $data);
+        // 如果default默认值为null 并且不存在值 则直接返回默认值null 不进行强制类型转移
+        // 否则则强制将默认值转移成对应类型
+        switch ($type) {
+            case 'intval':
+                if (is_array($data)) {
+                    foreach ($data as $key => $value) {
+                        $data[$key] = $value === '' ? ($default === null ? null : intval($default)) : intval($value);
                     }
-                    break;
-                case 'time':
+                } else {
+                    $data = $data === '' ? ($default === null ? null : intval($default)) : intval($data);
+                }
+                break;
+            case 'float':
+                if (is_array($data)) {
+                    foreach ($data as $key => $value) {
+                        $data[$key] = $value === '' ? ($default === null ? null : floatval($default)) : floatval($value);
+                    }
+                } else {
+                    $data = $data === '' ? ($default === null ? null : floatval($default)) : floatval($data);
+                }
+                break;
+            case 'text':
+                if (is_array($data)) {
+                    foreach ($data as $key => $value) {
+                        $data[$key] = $value === '' ? ($default === null ? null : strval($default)) : strval($value);
+                    }
+                } else {
+                    $data = $data === '' ? ($default === null ? null : strval($default)) : strval($data);
+                }
+                break;
+            case 'trim':
+                if (is_array($data)) {
+                    foreach ($data as $key => $value) {
+                        $data[$key] = $value === '' ? ($default === null ? null : trim($default)) : trim($value);
+                    }
+                } else {
+                    $data = $data === '' ? ($default === null ? null : trim($default)) : trim($data);
+                }
+                break;
+            case 'bool':
+                if (is_array($data)) {
+                    foreach ($data as $key => $value) {
+                        $data[$key] = $value === '' ? ($default === null ? null : (bool) $default) : (bool) $value;
+                    }
+                } else {
+                    $data = $data === '' ? ($default === null ? null : (bool) $default) : (bool) $data;
+                }
+                break;
+            case 'time':
+                if (is_array($data)) {
+                    foreach ($data as $key => $value) {
+                        if (stripos($value, '-') !== false) {
+                            $data[$key] = strtotime($value);
+                        }
+                    }
+                } else {
                     if (stripos($data, '-') !== false) {
                         $data = strtotime($data);
                     }
-                    break;
-                default:
-                    # code...
-                    break;
-            }
+                }
+                break;
+            case 'json': // 解析json数据
+                $data = $data === '' ? $default : json_decode(str_replace('\"', '"', htmlspecialchars_decode($data)), true);
+                break;
+            case 'implode': // 分割数组
+                $data = $data === '' ? '' : implode($default ? $default : ',', (array) $data);
+                break;
+            case 'img':
+                if (stripos($data, 'default') !== false) {
+                    $data = $default;
+                } else {
+                    $imgArr = explode(',', $data);
+                    $data   = [];
+                    foreach ($imgArr as $img) {
+                        if (stripos($img, 'http') !== false || stripos($img, '/') !== false) {
+                            $data[] = pathinfo($img, PATHINFO_BASENAME);
+                        } else {
+                            $data[] = $img;
+                        }
+                    }
+                    $data = implode(',', $data);
+                }
+                break;
+            default:
+                # code...
+                break;
         }
 
         return $data;

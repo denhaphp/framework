@@ -4,6 +4,8 @@
 //---------------------
 namespace denha;
 
+use denha\HttpResource;
+
 class Controller
 {
     public static $assign = [];
@@ -45,8 +47,8 @@ class Controller
         // 单个视图关闭调试模式
         $trace = isset($options['trace']) ? $options['trace'] : true;
 
-        if (get('all')) {
-            extract(get('all'), EXTR_OVERWRITE);
+        if (HttpResource::$request['params']['get']) {
+            extract(HttpResource::$request['params']['get'], EXTR_OVERWRITE);
         }
 
         if (self::$assign) {
@@ -159,7 +161,7 @@ class Controller
      * @param  string                   $lg     [语言类型]
      * @return [type]                           [description]
      */
-    public function ajaxReturn($status, $msg = null, $data = null)
+    protected function ajaxReturn($status, $msg = null, $data = null): void
     {
         header("Content-Type:application/json; charset=utf-8");
 
@@ -189,13 +191,14 @@ class Controller
         if (Start::$config['app_debug']) {
             $debug = [
                 'debug' => [
-                    'param' => [
-                        'post'  => (array) post(),
-                        'get'   => (array) get(),
+                    'param'      => [
+                        'post'  => (array) HttpResource::$request['params']['post'],
+                        'get'   => (array) HttpResource::$request['params']['get'],
                         'files' => $_FILES,
                     ],
-                    'ip'    => getIP(),
-                    'sql'   => Trace::$sqlInfo,
+                    'docComment' => explode(PHP_EOL, Start::$methodDocComment),
+                    'ip'         => getIP(),
+                    'sql'        => Trace::$sqlInfo,
                 ],
             ];
             $array = array_merge($array, $debug);
@@ -210,48 +213,6 @@ class Controller
         }
 
         // 正常ajax返回
-        exit(json_encode($value));
-    }
-
-    /**
-     * app返回参数
-     * @date   2018-01-30T16:43:24+0800
-     * @author ChenMingjiang
-     * @param  [type]                   $value [description]
-     * @param  [type]                   $lg    [国家]
-     * @return [type]                          [description]
-     */
-    protected function appReturn($value, $lg = 'zh')
-    {
-        header("Content-Type:application/json; charset=utf-8");
-        $array = array(
-            'code'   => 200,
-            'status' => true,
-            'data'   => array(),
-            'msg'    => '获取数据成功',
-        );
-
-        //控制开关
-        if (Start::$config['app_debug']) {
-            $debug = array(
-                'debug' => [
-                    'param' => [
-                        'post'  => (array) post(),
-                        'get'   => (array) get(),
-                        'files' => $_FILES,
-                    ],
-                    'ip'    => getIP(),
-                    'sql'   => Trace::$sqlInfo,
-                ],
-            );
-            $array = array_merge($array, $debug);
-        }
-
-        $value = array_merge($array, $value);
-        if ($lg != 'zh') {
-            $value['msg'] = dao('BaiduTrans')->baiduTrans($value['msg'], $this->lg);
-        }
-
         exit(json_encode($value));
     }
 

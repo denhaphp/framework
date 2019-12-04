@@ -2,11 +2,15 @@
 namespace denha;
 
 use denha\Config;
+use \ReflectionClass;
+use \ReflectionMethod;
 
 class Start
 {
     public static $client;
-    public static $config = [];
+    public static $config           = [];
+    public static $httpResource     = [];
+    public static $methodDocComment = ''; // 当前运行方法注解
 
     /**
      * [start description]
@@ -20,39 +24,63 @@ class Start
     {
 
         self::$client = APP_CONFIG;
-        //获取配置文档信息
+        // 获取配置文档信息
         self::$config = array_merge(Config::includes(), (array) Config::includes('config.' . APP . '.php'));
 
-        error_reporting(0);
         register_shutdown_function('denha\Trace::catchError');
         set_error_handler('denha\Trace::catchNotice');
         set_exception_handler('denha\Trace::catchApp');
+        error_reporting(0);
 
         Start::checkDisk(); //检测磁盘容量
 
         Start::filter(); //过滤
-        $class = Route::main($route); //解析路由
 
-        if (class_exists($class)) {
-            $object = new $class();
+        $class  = Route::main($route); //解析路由
+        $action = lcfirst(parsename(ACTION, 1)); // 方法名称
+
+        self::$httpResource = new HttpResource(); // 请求资源
+        $request            = self::$httpResource->getRequest();
+
+        $object = new ReflectionClass($class); // 获取类信息
+
+        // 进入post提交方法
+        if (($request['method'] == 'POST' || $request['method'] == 'AJAX') && $object->hasMethod($action . 'Post')) {
+            $methodAction = $action . 'Post';
         } else {
-            $object = false;
+            $methodAction = $action;
         }
 
-        if (!$object) {
-            throw new Exception('NOT FIND CONTROLLER [ ' . CONTROLLER . ' ] FROM : ' . $class = Route::$class);
+        $method = new ReflectionMethod($class, $methodAction); // 直接获取方法信息
+
+        // 只有公共方法可以调用
+        if (!$method->isPublic()) {
+            throw new Exception(Route::$class . ' NOT PUBLIC [ ' . $methodAction . ' ] ACTION');
         }
 
-        $action = lcfirst(parsename(ACTION, 1));
+        self::$methodDocComment = $method->getDocComment(); // 保存方法注解信息
 
-        //如果是POST提交 并且存在 function xxxPost方法 则自动调用该方法
-        !(IS_POST && method_exists($object, $action . 'Post')) ?: $action .= 'Post';
-
-        if (!method_exists($object, $action)) {
-            throw new Exception('Class : ' . Route::$class . ' NOT FIND [ ' . $action . ' ] ACTION');
+        $params = [];
+        foreach ($method->getParameters() as $item) {
+            if ($request['method'] == 'POST' && isset($request['params']['post'][$item->name])) {
+                $params[$item->name] = $request['params']['post'][$item->name];
+            } elseif ($request['method'] == 'GET' && isset($request['params']['get'][$item->name])) {
+                $params[$item->name] = $request['params']['get'][$item->name];
+            }
         }
 
-        $action = $object->$action();
+        // 方法过滤 带post提交专用过滤方法
+        // if ($object->hasMethod($methodAction . 'Validate')) {
+        //     $methodFilter = new ReflectionMethod($class, $methodAction . 'Validate'); // 直接获取方法信息
+        //     $params       = $methodFilter->invokeArgs(new $class(), [$params]) ?: $params;
+        // }
+        // // 方法过滤 默认通用普通过滤方法
+        // elseif ($object->hasMethod($action . 'Validate')) {
+        //     $methodFilter = new ReflectionMethod($class, $action . 'Validate'); // 直接获取方法信息
+        //     $params       = $methodFilter->invokeArgs(new $class(), [$params]) ?: $params;
+        // }
+
+        $method->invokeArgs(new $class(), $params);
 
     }
 

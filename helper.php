@@ -2,6 +2,7 @@
 
 use denha\Cache;
 use denha\Config;
+use denha\Controller;
 use denha\HttpResource;
 use denha\Route;
 
@@ -146,7 +147,7 @@ if (!function_exists('config')) {
      * @param  string                   $path [description]
      * @return [type]                         [description]
      */
-    function config($name = '', $path = '')
+    function config($name = null, $path = '')
     {
 
         return Config::get($name, $path);
@@ -203,21 +204,20 @@ if (!function_exists('cookie')) {
 
 if (!function_exists('dao')) {
     /**
-     * [Dao方法助手函数]
-     * @date   2018-05-21T14:43:21+0800
+     * dao助手方法
+     * @date   2019-12-03T17:33:19+0800
      * @author ChenMingjiang
      * @param  [type]                   $name [description]
-     * @param  string                   $app  [description]
-     * @return [type]                         [description]
+     * @return [type]                   [description]
      */
-    function dao($name, $app = '')
+    function dao($name)
     {
         static $_dao = [];
 
-        if (!$app) {
+        if (stripos($name, '.') === false) {
             $class = 'dao\\base\\' . $name;
         } else {
-            $class = 'dao\\' . $app . '\\' . $name;
+            $class = 'dao\\' . str_replace('.', '\\', $name);
         }
 
         $value = md5($class);
@@ -338,6 +338,10 @@ if (!function_exists('get')) {
      */
     function get($name, $type = '', $default = '')
     {
+        if (isset(HttpResource::$request['params']['get'][$name])) {
+            return HttpResource::filter(HttpResource::$request['params']['get'][$name], $type, $default);
+        }
+
         return HttpResource::get($name, $type, $default);
     }
 }
@@ -346,8 +350,8 @@ if (!function_exists('getVar')) {
     /**
      * 获取配置常量
      * -------------------
-     * | getVar('tags','console.article') 获取 appliaction/console/tools/var/article文件中的 tags.$ext 文件
-     * | getVar('tags','article') 获取 appliaction/tools/var/article文件中的 tags.$ext 文件
+     * | getVar('console.article.tags') 获取 appliaction/console/tools/var/article文件中的 tags.$ext 文件
+     * | getVar('article.tags') 获取 appliaction/tools/var/article文件中的 tags.$ext 文件
      * -------------------
      * @date   2018-07-12T17:10:33+0800
      * @author ChenMingjiang
@@ -356,23 +360,21 @@ if (!function_exists('getVar')) {
      * @param  [type]                   $ext      [description]
      * @return [type]                             [description]
      */
-    function getVar($filename, $path, $ext = EXT)
+    function getVar($path, $options = [])
     {
+        $ext = isset($options['ext']) ? $options['ext'] : EXT;
+        $dir = isset($options['dir']) ? $options['dir'] : APP_PATH . 'tools' . DS . 'var' . DS;
+
         static $_vars = [];
 
-        if (!$filename) {
-            return null;
-        }
+        $name = md5($path);
 
-        $name = md5($filename . $path);
         if (isset($_vars[$name])) {
             return $_vars[$name];
         } else {
-            if (($length = stripos($path, '.')) === false) {
-                $filePath = APP_PATH . 'tools' . DS . 'var' . DS . 'base' . DS . $path . DS . $filename . $ext;
-            } else {
-                $filePath = APP_PATH . 'tools' . DS . 'var' . DS . substr($path, 0, $length) . DS . substr(strstr($path, '.'), 1) . DS . $filename . $ext;
-            }
+
+            $path     = str_replace('.', DS, $path);
+            $filePath = $dir . $path . $ext;
 
             if (is_file($filePath)) {
                 $_vars[$name] = include $filePath;
@@ -494,7 +496,7 @@ if (!function_exists('imgUrl')) {
      * @author ChenMingjiang
      * @param  [type]                   $name [图片名称]
      * @param  string                   $path [图片地址]
-     * @param  integer                  $size [description]
+     * @param  integer                  $size [图片尺寸]
      * @param  boolean                  $host [description]
      * @return [type]                         [description]
      */
@@ -512,45 +514,8 @@ if (!function_exists('imgUrl')) {
                 $url = config('ststic') . '/default.png';
                 $url = !$host ? $url : $host . $url;
             } elseif ($size) {
-
-                if ($path) {
-                    $url = config('uploadfile') . $path . '/' . $imgName;
-                } else {
-                    $url = config('uploadfile') . $imgName;
-                }
-
+                $url = zipimg($imgName, $path, $size);
                 $url = !$host ? $url : $host . $url;
-
-                $ext        = pathinfo($name, PATHINFO_EXTENSION);
-                $zipImgName = basename($name, '.' . $ext) . '_' . $size . '.' . $ext;
-                $url        = config('uploadfile') . 'zipimg/' . $zipImgName;
-
-                // 如果不存在缓存 缩略图则创建缩略图
-                $zipimglists = cache('zipimglists');
-                if (!isset($zipimglists[md5($zipImgName)])) {
-
-                    if ($path) {
-                        $url = config('uploadfile') . $path . '/' . $imgName;
-                    } else {
-                        $url = config('uploadfile') . $imgName;
-                    }
-
-                    // 根据原图 创建新的缩略图
-                    if (imgExists($url)) {
-                        $size   = explode('x', $size);
-                        $width  = $size[0];
-                        $height = !empty($size[1]) ? $size[1] : 0;
-                        $res    = dao('File')->zipImg($url, $width, $height)['status'];
-
-                        if ($res) {
-                            $url = config('uploadfile') . 'zipimg/' . $zipImgName;
-                        }
-
-                    } else {
-                        $url = config('ststic') . '/default.png';
-                    }
-
-                }
             } else {
                 if ($path) {
                     $url = config('uploadfile') . $path . '/' . $imgName;
@@ -566,6 +531,73 @@ if (!function_exists('imgUrl')) {
 
         $data = count($data) > 1 ? $data : current($data);
         return $data;
+    }
+}
+
+if (!function_exists('zipImg')) {
+    /**
+     * 图片压缩
+     * @date   2018-06-25T20:37:55+0800
+     * @author ChenMingjiang
+     * @param  string                   $name           [图片名称]
+     * @param  array                    $path           [图片地址]
+     * @param  array                    $size           [图片尺寸]
+     * @return [type]                                   [description]
+     */
+    function zipImg($name, $path = '', $size = '')
+    {
+
+        $ext        = pathinfo($name, PATHINFO_EXTENSION);
+        $zipImgName = basename($name, '.' . $ext) . '_' . $size . '.' . $ext;
+
+        // 如果不存在缓存 缩略图则创建缩略图
+        $cacheLists = cache('zipimglists');
+        if (!isset($cacheLists[md5($zipImgName)])) {
+            // 如何原图是否存在 根据原图=>创建新的缩略图
+            $url = $path ? config('uploadfile') . $path . '/' . $name : config('uploadfile') . $name;
+
+            if (imgExists($url)) {
+                $size   = explode('x', $size);
+                $width  = $size[0];
+                $height = !empty($size[1]) ? $size[1] : 0;
+                $res    = dao('File')->zipImg($url, $width, $height)['status'];
+
+                if ($res) {
+                    // 保留缓存记录
+                    $cacheLists[md5($zipImgName)] = $zipImgName;
+                    cache('zipimglists', $cacheLists);
+
+                    $url = config('uploadfile') . 'zipimg/' . $zipImgName;
+                }
+            } else {
+                $url = config('ststic') . '/default.png';
+            }
+        } else {
+            $url = config('uploadfile') . 'zipimg/' . $cacheLists[md5($zipImgName)];
+        }
+
+        return $url;
+    }
+}
+
+if (!function_exists('view')) {
+    /**
+     * 模板渲染
+     * @date   2018-06-25T20:37:55+0800
+     * @author ChenMingjiang
+     * @param  string                   $viewPath       [视图地址]
+     * @param  array                    $viewParamData  [渲染变量值]
+     * @param  array                    $options        [预定义参数]
+     *                                                  trace:单个视图关闭调试模式 【默认】true：开启 fasle：关闭
+     *                                                  peg：自定义路径
+     * @return [type]                                   [description]
+     */
+    function view($viewPath, $viewParamData = [], $options = [])
+    {
+
+        $Controller = new Controller();
+
+        $this->show($viewPath = '', $viewParamData = [], $options = []);
     }
 }
 
@@ -951,8 +983,12 @@ if (!function_exists('post')) {
      * @param  string                   $default [description]
      * @return [type]                            [description]
      */
-    function post($name, $type = '', $default = '')
+    function post($name = null, $type = '', $default = '')
     {
+
+        if (isset(HttpResource::$request['params']['post'][$name])) {
+            return HttpResource::filter(HttpResource::$request['params']['post'][$name], $type, $default);
+        }
 
         return HttpResource::post($name, $type, $default);
     }
@@ -968,7 +1004,7 @@ if (!function_exists('params')) {
      * @param  string                   $default [description]
      * @return [type]                            [description]
      */
-    function params($name, $type = '', $default = '')
+    function params($name = null, $type = '', $default = '')
     {
         $data = get($name, $type, null);
         if ($data === null) {
