@@ -43,7 +43,7 @@ class BuildSql
 
     }
 
-    public function config(array $dbConfig = []): void
+    public function config(array $dbConfig = [])
     {
         if ($dbConfig) {
             self::$dbConfig = $dbConfig;
@@ -57,6 +57,7 @@ class BuildSql
                 self::$do[$hash] = $this->open($value);
             }
         }
+
     }
 
     public function parseDNS(array $config): string
@@ -114,7 +115,7 @@ class BuildSql
 
     /** 链接 */
     public function connect(int $id = 0)
-    {   
+    {
         self::$id   = $id;
         self::$link = self::$do[md5(json_encode(self::$dbConfig[$id]))];
 
@@ -131,7 +132,7 @@ class BuildSql
     }
 
     /** 构造Sql初始化 */
-    public function init(): void
+    public function init()
     {
 
         $this->bulid = [
@@ -141,12 +142,15 @@ class BuildSql
             'data'      => null,
             'order'     => null,
             'group'     => null,
+            'table'     => null,
         ];
 
         $this->options = [
             'data'  => [],
             'field' => [],
             'order' => [],
+            'limit' => [],
+            'table' => [],
         ];
 
         $this->connect();
@@ -701,7 +705,7 @@ class BuildSql
     }
 
     /** 构建SQL语句 */
-    public function bulidSql(string $type = 'SELECT'): void
+    public function bulidSql(string $type = 'SELECT')
     {
         $this->options['type'] = $type;
 
