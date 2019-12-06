@@ -156,7 +156,7 @@ class Trace
         }
     }
 
-    //增加非致命错误信息记录
+    // 增加非致命错误信息记录
     public static function addErrorInfo($data)
     {
 
@@ -167,7 +167,7 @@ class Trace
         }
     }
 
-    //增加sql执行信息记录
+    // 增加sql执行信息记录
     public static function addSqlInfo($data)
     {
         if (is_array($data)) {
@@ -179,14 +179,22 @@ class Trace
             }
 
             self::$dbAllTime += $data['time'];
+            $dbAllTime = '数据库总运行时间:' . self::$dbAllTime;
+
         } else {
             $info[] = $data;
         }
 
         if (!self::$sqlInfo) {
             self::$sqlInfo = $info;
+            if (isset($dbAllTime)) {
+                self::$sqlInfo[0] = $dbAllTime;
+            }
         } else {
             self::$sqlInfo = array_merge(self::$sqlInfo, (array) $info);
+            if (isset($dbAllTime)) {
+                self::$sqlInfo[0] = $dbAllTime;
+            }
         }
     }
 
