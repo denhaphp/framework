@@ -11,7 +11,7 @@ class Trace
 {
     private static $tracePageTabs  = ['BASE' => '基本', 'FILE' => '文件', 'ERR|NOTIC' => '错误', 'SQL' => 'SQL', 'DEBUG' => '调试'];
     private static $traceErrorType = [0 => '', 1 => 'FATAL ERROR', 2 => 'WARNING', 4 => 'PARSE', 8 => 'NOTICE', 100 => 'SQL'];
-    private static $dbAllTime      = 0; // 数据运行时间
+    private static $dbTrace        = []; // 数据库调试信息
 
     public static $errorInfo = []; //错误信息
     public static $sqlInfo   = []; //sql执行信息
@@ -171,31 +171,45 @@ class Trace
     public static function addSqlInfo($data)
     {
         if (is_array($data)) {
-            $info[] = 'SQL :' . $data['sql'] . ' [' . $data['time'] . 's]';
-            if (isset($data['explain'])) {
+
+            if (isset($data['time'])) {
+
+                self::$dbTrace['allTime'] = isset(self::$dbTrace['allTime']) ? self::$dbTrace['allTime'] : 0;
+                self::$dbTrace['allTime'] += $data['time'];
+
+                $dbTraceInfo = '数据库总运行时间:' . self::$dbTrace['allTime'];
+            }
+
+            if (isset($data['PS'])) {
+                self::$dbTrace['psInfo'] = $data['PS'];
+
+            } elseif (isset($data['explain'])) {
+                $info[] = 'SQL :' . $data['sql'] . ' [' . $data['time'] . 's]';
                 foreach ($data['explain'] as $explain) {
                     $info[] = 'EXPLAIN :' . json_encode($explain);
                 }
+            } else {
+                $info[] = 'SQL :' . $data['sql'] . ' [' . $data['time'] . 's]';
             }
-
-            self::$dbAllTime += $data['time'];
-            $dbAllTime = '数据库总运行时间:' . self::$dbAllTime;
 
         } else {
             $info[] = $data;
         }
 
-        if (!self::$sqlInfo) {
-            self::$sqlInfo = $info;
-            if (isset($dbAllTime)) {
-                self::$sqlInfo[0] = $dbAllTime;
-            }
-        } else {
-            self::$sqlInfo = array_merge(self::$sqlInfo, (array) $info);
-            if (isset($dbAllTime)) {
-                self::$sqlInfo[0] = $dbAllTime;
+        if (isset($info)) {
+            if (!self::$sqlInfo) {
+                self::$sqlInfo = $info;
+                if (isset($dbTraceInfo)) {
+                    self::$sqlInfo[0] = isset(self::$dbTrace['psInfo']) ? self::$dbTrace['psInfo'] . ' ' . $dbTraceInfo : $dbTraceInfo;
+                }
+            } else {
+                self::$sqlInfo = array_merge(self::$sqlInfo, (array) $info);
+                if (isset($dbTraceInfo)) {
+                    self::$sqlInfo[0] = isset(self::$dbTrace['psInfo']) ? self::$dbTrace['psInfo'] . ' ' . $dbTraceInfo : $dbTraceInfo;
+                }
             }
         }
+
     }
 
     /** 获取文件代码 */
@@ -233,7 +247,7 @@ class Trace
         $dbName   = '';
         foreach ($dbConfig as $item) {
             !isset($item['host']) ?: $dbName .= $item['host'] . ' : ';
-            !isset($item['name']) ?: $dbName .= $item['name'] . '  / ';
+            !isset($item['name']) ?: $dbName .= $item['name'] . ':' . $item['port'] . '  / ';
         }
 
         $base = [
@@ -245,7 +259,7 @@ class Trace
             '配置加载'          => count(Start::$config),
             '会话信息'          => 'SESSION_ID=' . session_id(),
 
-            '数据库运行时间' => self::$dbAllTime,
+            '数据库运行时间' => isset(self::$dbTrace['allTime']) ? self::$dbTrace['allTime'] : 0,
             '数据库'             => $dbName,
             '磁盘信息'          => number_format(DISK_TOTAL_SPACE / 1024 / 1024 / 1024, 3) . ' G (all) / ' . number_format((DISK_TOTAL_SPACE - DISK_FREE_SPACE) / 1024 / 1024 / 1024, 3) . ' G (use) / ' . number_format(DISK_FREE_SPACE / 1024 / 1024 / 1024, 3) . 'G (free)',
         ];

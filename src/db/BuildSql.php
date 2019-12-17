@@ -20,6 +20,7 @@ class BuildSql
 
     public static $link; // 当前链接符
     public static $id; // 当前链接配置ID
+    public static $PS = []; //  记录 QPS TPS 参数
 
     public $options; // 记录参数信息$
     public $bulid; // 记录构造Sql;
@@ -116,6 +117,7 @@ class BuildSql
     /** 链接 */
     public function connect(int $id = 0)
     {
+
         self::$id   = $id;
         self::$link = self::$do[md5(json_encode(self::$dbConfig[$id]))];
 
@@ -127,6 +129,16 @@ class BuildSql
         $this->tablepre            = $this->config['prefix'];
         $this->options['tablepre'] = $this->config['prefix'];
         $this->options['database'] = $this->config['name'];
+
+        // 存入调试信息中
+        if (Config::get('trace') && $this->config['ps_sql']) {
+            if (!isset(self::$PS[$id])) {
+                self::$PS[$id]['QPS'] = $this->getQPS();
+                self::$PS[$id]['TPS'] = $this->getQPS();
+                // 记录QPS TPS 调试信息
+                Trace::addSqlInfo(['PS' => 'QPS:' . self::$PS[$id]['QPS'] . ' TPS:' . self::$PS[$id]['TPS']]);
+            }
+        }
 
         return $this;
     }
@@ -154,6 +166,50 @@ class BuildSql
         ];
 
         $this->connect();
+    }
+
+    public function getQPS()
+    {
+        $result = $this->query("SHOW GLOBAL STATUS LIKE 'Questions'");
+        if ($result) {
+            $questions = (int) $result->fetch(PDO::FETCH_NUM)[1];
+        }
+
+        $result = $this->query("SHOW GLOBAL STATUS LIKE 'Uptime'");
+        if ($result) {
+            $uptime = (int) $result->fetch(PDO::FETCH_NUM)[1];
+        }
+
+        if (!$questions) {
+            return 0;
+        }
+
+        return ($questions / $uptime);
+
+    }
+
+    public function getTPS()
+    {
+
+        $result = $this->query("SHOW GLOBAL STATUS LIKE 'Com_commit'");
+        if ($result) {
+            $commit = (int) $result->fetch(PDO::FETCH_NUM)[1];
+        }
+        $result = $this->query("SHOW GLOBAL STATUS LIKE 'Com_rollback'");
+        if ($result) {
+            $rollback = (int) $result->fetch(PDO::FETCH_NUM)[1];
+        }
+        $result = $this->query("SHOW GLOBAL STATUS LIKE 'Uptime'");
+        if ($result) {
+            $uptime = (int) $result->fetch(PDO::FETCH_NUM)[1];
+        }
+
+        if ($commit + $rollback <= 0) {
+            return 0;
+        }
+
+        return (($commit + $rollback) / $uptime);
+
     }
 
     /**
@@ -404,7 +460,7 @@ class BuildSql
         $expRule = [
             ['>', '<', '>=', '<=', '!=', 'like', '<>', '='],
             ['in', 'not in', 'IN', 'NOT IN'],
-            ['instr', 'INSTR'],
+            ['instr', 'INSTR', 'not insrt', 'NOT INSTR'],
             ['between', 'BETWEEN'],
             ['or', 'OR'],
             ['_string', '_STRING'],
@@ -1012,6 +1068,8 @@ class BuildSql
      */
     public function query($sql = '')
     {
+
+        $this->bulid['sql'] = $sql ? $sql : $this->bulid['sql'];
 
         // 存入Sql Explain信息
         if (!empty($this->config['sql_explain'])) {
