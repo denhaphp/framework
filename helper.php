@@ -822,9 +822,6 @@ if (!function_exists('table')) {
     {
         $type  = is_callable($type) ? $type : 'md5';
         $token = call_user_func($type, $_SERVER['REQUEST_TIME_FLOAT']);
-        // if ($this->isAjax()) {
-        // header($name . ': ' . $token);
-        // }
         session($name, $token);
         return $token;
     }
@@ -839,7 +836,7 @@ if (!function_exists('table')) {
      * @param  boolean                  $options    [description]
      * @return [type]                               [description]
      */
-    function table($name, $options = [])
+    function table($name = null, $options = [])
     {
         static $_do;
 

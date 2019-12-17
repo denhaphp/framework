@@ -31,9 +31,6 @@ class HttpResource
         if (PHP_SAPI == 'cli') {
             $method = 'CLI';
         }
-        // elseif ((isset($_SERVER['HTTP_X_REQUESTED_WITH']) && (strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest')) || !empty($_POST['ajax']) || !empty($_GET['ajax'])) {
-        //     $method = 'AJAX';
-        // }
         else {
             $method = $_SERVER['REQUEST_METHOD'];
         }
@@ -49,7 +46,7 @@ class HttpResource
             foreach ($_GET as $key => $val) {
                 if (!is_array($val)) {
                     $val        = trim($val);
-                    $data[$key] = !get_magic_quotes_gpc() ? htmlspecialchars(addslashes($val), ENT_QUOTES, 'UTF-8') : htmlspecialchars($val, ENT_QUOTES, 'UTF-8');
+                    $data[$key] =  htmlspecialchars(addslashes($val), ENT_QUOTES, 'UTF-8');
                 } else {
                     $data[$key] = $val;
                 }

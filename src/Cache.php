@@ -4,6 +4,8 @@
 //-------------------------
 namespace denha;
 
+use denha\Config;
+
 class Cache
 {
     public static $instance = [];
@@ -11,7 +13,7 @@ class Cache
 
     public static function connect($options = [])
     {
-        $config = !empty($options) ? $options : config('cache');
+        $config = !empty($options) ? $options : Config::get('cache');
         $type   = !empty($config['type']) ? $config['type'] : 'File';
         $id     = md5(json_encode($config));
 
