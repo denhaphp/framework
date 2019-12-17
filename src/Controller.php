@@ -5,6 +5,8 @@
 namespace denha;
 
 use denha\HttpResource;
+use denha\Template;
+use denha\Trace;
 
 class Controller
 {
@@ -36,115 +38,25 @@ class Controller
      * @param  array                    $viewParamData  [渲染变量值]
      * @param  array                    $options        [预定义参数]
      *                                                  trace:单个视图关闭调试模式 【默认】true：开启 fasle：关闭
-     *                                                  peg：自定义路径
      * @return [type]                                   [description]
      */
-    protected function show($viewPath = '', $viewParamData = [], $options = [])
+    protected function show(string $viewPath = '', array $viewParamData = [], array $options = [])
     {
-
-        // true 自定义路径
-        $peg = isset($options['peg']) ? $options['peg'] : false;
         // 单个视图关闭调试模式
         $trace = isset($options['trace']) ? $options['trace'] : true;
 
+        $viewParamData = array_merge($viewParamData, self::$assign);
+
         if (HttpResource::$request['params']['get']) {
-            extract(HttpResource::$request['params']['get'], EXTR_OVERWRITE);
+            $viewParamData = array_merge($viewParamData, HttpResource::$request['params']['get']);
         }
 
-        if (self::$assign) {
-            // 模板阵列变量分解成为独立变量
-            extract(self::$assign, EXTR_OVERWRITE);
-        }
-
-        if ($viewParamData) {
-            // 模板阵列变量分解成为独立变量
-            extract($viewParamData, EXTR_OVERWRITE);
-        }
-
-        if (!$peg) {
-            if (!$viewPath) {
-                $path = VIEW_PATH . str_replace('.', DS, MODULE) . DS . parseName(CONTROLLER, false) . DS . ACTION . '.html';
-            }
-            //绝对路径
-            elseif (stripos($viewPath, '/') === 0) {
-                $path = VIEW_PATH . substr($viewPath, 1) . '.html';
-            }
-            //相对路径
-            else {
-                $path = VIEW_PATH . str_replace('.', DS, MODULE) . DS . $viewPath . '.html';
-            }
-        } else {
-            $path = $viewPath;
-        }
-
-        if (!is_file($path)) {
-            throw new Exception('视图地址:' . $path . '不存在 ');
-        }
-
-        $cachePath = DATA_TPL_PATH . md5($path) . '.php';
-
-        ob_start();
-        // 开启页面缓存
-        if (is_file($cachePath) && filemtime($path) == filemtime($cachePath) && !config('debug')) {
-            include $cachePath;
-        } else {
-            // 处理视图模板
-            $template = new Template($path);
-            $template->getContent();
-            include $template->loadPath;
-        }
-
-        $content = ob_get_clean();
-
-        // 标签翻译功能
-        if (config('tag_trans')) {
-            $content = $this->tagTrans($content);
-        }
-
-        echo $content;
-
+        echo Template::parseContent(['view' => $viewPath, 'data' => $viewParamData]);
+       
         // 模块debug功能
         if (config('trace') && $trace) {
             Trace::run();
         }
-    }
-
-    /** 标签翻译功能 */
-    protected function tagTrans($content)
-    {
-
-        $regular = '/{FY:(.*?):(.*?)}/is';
-        preg_match_all('/{FY:(.*?):(.*?)}/is', $content, $matches);
-
-        if (array_filter($matches)) {
-
-            //组合翻译结构
-            foreach ($matches[0] as $key => $value) {
-                $transArray[$matches[2][$key]][] = $matches[1][$key];
-            }
-
-            //批量翻译
-            if ($transArray) {
-                foreach ($transArray as $key => $value) {
-                    if ($key != 'zh') {
-                        $transValue[$key] = dao('BaiduTrans')->baiduTrans($value, $key, 'zh');
-                    } else {
-                        foreach ($value as $key => $value) {
-                            $transValue['zh'][$value] = $value;
-                        }
-                    }
-                }
-
-                foreach ($transValue as $key => $value) {
-                    foreach ($value as $k => $v) {
-                        $content = str_replace("{FY:$k:$key}", $v, $content);
-                    }
-                }
-            }
-
-        }
-
-        return $content;
     }
 
     /**
