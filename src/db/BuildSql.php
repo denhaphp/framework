@@ -1124,24 +1124,21 @@ class BuildSql
     public function addErrorSqlLog()
     {
 
-        //如果没有写入权限尝试修改权限 如果修改后还是失败 则跳过
-        if (isWritable(DATA_PATH)) {
-            $path = DATA_SQL_PATH . $this->options['database'] . DS;
-            is_dir($path) ? '' : mkdir($path, 0755, true);
+        $path = DATA_SQL_PATH . $this->options['database'] . DS;
+        is_dir($path) ? '' : mkdir($path, 0755, true);
 
-            $path .= 'error_' . date('Y_m_d', TIME) . '.text';
+        $path .= 'error_' . date('Y_m_d', TIME) . '.text';
 
-            $info = '------ ' . $this->sqlInfo['time'];
-            $info .= ' | ' . date('Y-m-d H:i:s', TIME);
-            $info .= ' | ip:' . Config::IP();
-            $info .= ' | Url:' . URL . '/' . Route::$uri;
-            $info .= PHP_EOL;
+        $info = '------ ' . $this->sqlInfo['time'];
+        $info .= ' | ' . date('Y-m-d H:i:s', TIME);
+        $info .= ' | ip:' . Config::IP();
+        $info .= ' | Url:' . URL . '/' . Route::$uri;
+        $info .= PHP_EOL;
 
-            $content = $this->sqlInfo['sql'] . ';' . PHP_EOL . '--------------' . PHP_EOL;
+        $content = $this->sqlInfo['sql'] . ';' . PHP_EOL . '--------------' . PHP_EOL;
 
-            error_log($content . $info, 3, $path);
+        error_log($content . $info, 3, $path);
 
-        }
     }
 
     /**
@@ -1152,11 +1149,6 @@ class BuildSql
      */
     public function addSqlLog()
     {
-        // 如果没有写入权限尝试修改权限 如果修改后还是失败 则跳过
-        if (!isWritable(DATA_PATH)) {
-            return false;
-        }
-
         //创建文件夹
         is_dir(DATA_SQL_PATH) ? '' : mkdir(DATA_SQL_PATH, 0755, true);
 

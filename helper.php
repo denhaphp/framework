@@ -438,30 +438,6 @@ if (!function_exists('getMaxDim')) {
     }
 }
 
-if (!function_exists('isWritable')) {
-    /**
-     * 如果没有写入权限尝试修改权限 如果修改后还是失败 则跳过
-     * @date   2018-05-21T14:43:39+0800
-     * @author ChenMingjiang
-     * @param  [type]                   $path [description]
-     * @return boolean                        [description]
-     */
-    function isWritable($path)
-    {
-
-        if (!is_writable($path) && $path) {
-            chmod($path, 0755);
-            if (!is_writable($path)) {
-                return false;
-            } else {
-                return true;
-            }
-        }
-
-        return true;
-    }
-}
-
 if (!function_exists('imgExists')) {
     /**
      * 判断图片是否存在
