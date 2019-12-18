@@ -20,7 +20,7 @@ class Route
     public static $regularUrl = [];
 
     //执行主体
-    public static function main($route = 'mca')
+    public static function main()
     {
         self::$config          = config('route');
         self::$thisRule['uri'] = self::$uri = self::parseUri();

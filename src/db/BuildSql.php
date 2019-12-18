@@ -49,7 +49,7 @@ class BuildSql
         if ($dbConfig) {
             self::$dbConfig = $dbConfig;
         } else {
-            self::$dbConfig = Config::includes('db.php')['dbInfo'];
+            self::$dbConfig = Config::includes('db.php')['config'];
         }
 
         foreach (self::$dbConfig as $key => $value) {

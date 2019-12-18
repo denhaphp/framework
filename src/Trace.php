@@ -243,7 +243,7 @@ class Trace
     private static function baseInfo()
     {
 
-        $dbConfig = Config::includes('db.php')['dbInfo'];
+        $dbConfig = Config::includes('db.php')['config'];
         $dbName   = '';
         foreach ($dbConfig as $item) {
             !isset($item['host']) ?: $dbName .= $item['host'] . ' : ';

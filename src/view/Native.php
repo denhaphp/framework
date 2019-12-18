@@ -92,6 +92,8 @@ class Native
      */
     public function parseInclude()
     {   
+        $regular = '#' . $this->config->left . 'include\s(.*?)' . $this->config->right . '#is';
+        preg_match_all($regular, $this->content, $matches);
         if ($matches) {
             foreach ($matches[1] as $key => $tpl) {
                 $content = $this->parseIncludeFile($tpl);

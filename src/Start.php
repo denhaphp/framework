@@ -20,7 +20,7 @@ class Start
      * @param  string                   $route  [路由模式 mca smca ca]
      * @return [type]                           [description]
      */
-    public static function up($route = 'mca')
+    public static function up()
     {
 
         self::$client = APP_CONFIG;
@@ -36,7 +36,7 @@ class Start
 
         Start::filter(); //过滤
 
-        $class  = Route::main($route); //解析路由
+        $class  = Route::main(); //解析路由
         $action = lcfirst(parsename(ACTION, 1)); // 方法名称
 
         self::$httpResource = new HttpResource(); // 请求资源
