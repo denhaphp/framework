@@ -69,17 +69,6 @@ class Start
             }
         }
 
-        // 方法过滤 带post提交专用过滤方法
-        // if ($object->hasMethod($methodAction . 'Validate')) {
-        //     $methodFilter = new ReflectionMethod($class, $methodAction . 'Validate'); // 直接获取方法信息
-        //     $params       = $methodFilter->invokeArgs(new $class(), [$params]) ?: $params;
-        // }
-        // // 方法过滤 默认通用普通过滤方法
-        // elseif ($object->hasMethod($action . 'Validate')) {
-        //     $methodFilter = new ReflectionMethod($class, $action . 'Validate'); // 直接获取方法信息
-        //     $params       = $methodFilter->invokeArgs(new $class(), [$params]) ?: $params;
-        // }
-
         $method->invokeArgs(new $class(), $params);
 
     }

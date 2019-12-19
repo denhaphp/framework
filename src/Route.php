@@ -4,6 +4,8 @@
 //---------------------
 namespace denha;
 
+use denha\Config;
+
 class Route
 {
     public static $path;
@@ -17,23 +19,28 @@ class Route
         'rule' => [], // 改写路由信息
     ];
     public static $id         = 0;
-    public static $regularUrl = [];
+    public static $regularUrl = []; // 路由规则数组
 
-    //执行主体
+    // 执行主体
     public static function main()
     {
-        self::$config          = config('route');
+        self::$config          = Config::get('route');
         self::$thisRule['uri'] = self::$uri = self::parseUri();
 
         // 检查规则路由
         if (self::$config['open_route']) {
+            // 加载路由规则文件
+            $routeFiles = (array)self::$config['route_files'];
+            foreach ($routeFiles as $file) {
+                include_once $file;
+            }
 
-            include_once CONFIG_PATH . 'route.php';
-
+            // 获取当前url
             self::$uri = self::getRouteUrl('/' . self::$uri);
+
         }
 
-        //转换Url参数为GET参数
+        // 转换Url参数为GET参数
         $uriArr = explode('/s/', self::$uri);
         if (isset($uriArr[1])) {
             self::changeGetValue($uriArr[1], ['isGet' => true]);
@@ -43,7 +50,7 @@ class Route
 
         // 开启指定结构层数
         if (self::$config['open_level']) {
-            $routeArr = array_values(array_slice($baseUriArr, 0, self::$config['level']));
+            $routeArr = array_values(array_slice($routeArr, 0, self::$config['level']));
         }
 
         define('MODULE', implode('.', array_slice($routeArr, 0, -2)));
@@ -58,22 +65,30 @@ class Route
 
     /**
      * 保存路由规则
-     * @date   2018-07-13T09:32:01+0800
+     * @date   2019-12-19T09:32:01+0800
      * @author ChenMingjiang
-     * @param  [type]                   $url       [description]
-     * @param  string                   $changeUrl [description]
+     * @param  [type]                   $url       [当前路由信息]
+     * @param  string                   $changeUrl [改写路由信息]
      * @param  array                    $options   [description]
+     *                                             params 参数隐藏
+     *                                             suffix 指定后缀名
+     *                                             limit_suffix 限制后缀名
+     *                                             hide_url true:隐藏原生url false:不隐藏
+     *                                             jump 自动跳转
      * @return [type]                              [description]
      */
-    public static function rule($url, $changeUrl = '/', $options = [])
+    public static function rule(string $url, $changeUrl = null, array $options = [])
     {
+
+        if(!$changeUrl){
+            return false;
+        }
 
         $params      = isset($options['params']) ? $options['params'] : '';
         $suffix      = isset($options['suffix']) ? $options['suffix'] : '/';
         $limitSuffix = isset($options['limit_suffix']) ? explode(',', $options['limit_suffix']) : '';
+        $oldUriHide   = isset($options['old_uri_hide']) ? $options['old_uri_hide'] : Config::get('route')['old_uri_hide'];
         $jump        = isset($options['jump']) ? $options['jump'] : false;
-
-        $key = md5($changeUrl . $params);
 
         self::$rule[self::$id] = [
             'url'          => $url,
@@ -81,17 +96,39 @@ class Route
             'params'       => $params,
             'suffix'       => $suffix,
             'limit_suffix' => $limitSuffix,
+            'old_uri_hide' => $oldUriHide,
             'jump'         => $jump,
         ];
 
+        // 加入黑名单列表
+        if($oldUriHide){
+            self::$regularUrl['blacklist'][md5($url.$params)] = self::$id;
+        }
+
+        // 闭包访问组 闭包访问组不存在改写情况则单独分出来
+        if(is_object($changeUrl) || $changeUrl instanceof \Closure){
+            self::$regularUrl['closure'][md5($url.$params)] = self::$id;
+        }
+        // 改写信息
+        else{
+            self::$regularUrl['changeUrl'][md5($changeUrl . $params)] = self::$id;
+        }
+
+        // 原生信息
         self::$regularUrl['url'][md5($url . $params)]             = self::$id;
-        self::$regularUrl['changeUrl'][md5($changeUrl . $params)] = self::$id;
 
         self::$id++;
+
     }
 
-    // 解析请求URL
-    public static function parseRouteUri($uri)
+    /**
+     * 解析当前请求URL
+     * @date   2019-12-19T13:54:08+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $uri [description]
+     * @return [type]                   [description]
+     */
+    public static function parseRouteUri(string $uri)
     {
         $uriArr = explode('/s/', $uri);
 
@@ -108,10 +145,16 @@ class Route
         return [$changeUrl, $params];
     }
 
-    /** 获取实际路径 */
-    public static function getRouteUrl($uri)
+    /** 
+     * 根据改写路径获取实际路径
+     * @date   2019-12-19T13:53:53+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $uri [改写url]
+     * @return [type]                   [description]
+     */
+    public static function getRouteUrl(string $uri)
     {
-
+        // 分解当前Url
         list($changeUrl, $params) = self::parseRouteUri($uri);
 
         // 获取后缀
@@ -119,74 +162,61 @@ class Route
         if ($suffix) {
             // 删除后缀
             $changeUrl = str_replace('.' . $suffix, '', $changeUrl);
-        }
+        }  
 
-        $isJump = false; //是否自动跳转
+        $cpmd5 = md5($changeUrl.$params); // 参数+地址匹配
+        $cmd5  = md5($changeUrl); // 纯地址匹配
 
-        // 原始地址+参数匹配 完全匹配
-        $keyMD5 = md5($changeUrl . $params);
-        if (isset(self::$regularUrl['changeUrl'][$keyMD5])) {
-            $rule   = &self::$rule[self::$regularUrl['changeUrl'][$keyMD5]];
-            $url    = $rule['url'];
-            $isJump = $rule['jump'];
-
-            self::$thisRule['rule'] = $rule; // 保存改写路由信息
-            self::changeGetValue($rule['params']); // 保存GET参数
-        }
-
-        // 若完全匹配不存在 则不匹配参数只匹配路径  部分匹配
-        if (!self::$thisRule['rule']) {
-            $keyMD5 = md5($changeUrl);
-            if (isset(self::$regularUrl['changeUrl'][$keyMD5])) {
-                $rule   = &self::$rule[self::$regularUrl['changeUrl'][$keyMD5]];
-                $url    = $rule['url'] . ($params ? '/s/' . $params : '');
-                $isJump = $rule['jump'];
-
-                self::$thisRule['rule'] = $rule; // 保存改写路由信息
-                self::changeGetValue($rule['params']); // 保存GET参数
-
+        // 判断是否存在原生地址黑名单黑名单
+        if(isset(self::$regularUrl['blacklist'][$cpmd5]) || isset(self::$regularUrl['blacklist'][$cmd5]) ){
+            if(Config::get('debug')){
+                throw new Exception('当前路由已被禁止访问');
+            }else{
+                throw new Exception('禁止访问');
             }
         }
 
-        //自动跳转Url
-        if ($isJump) {
-            die(header('Location:' . $url));
+        // 如果存在闭包信息则直接返回
+        if(isset(self::$regularUrl['closure'][$cpmd5]) || isset(self::$regularUrl['closure'][$cmd5]) ){
+            die(call_user_func(self::$rule[self::$regularUrl['closure'][$cpmd5]]['change_url'] ?? self::$rule[self::$regularUrl['closure'][$cmd5]]['change_url']));
         }
 
-        return isset($url) ? $url : $uri;
+        // 匹配changeUrl
+         if(isset(self::$regularUrl['changeUrl'][$cpmd5]) || isset(self::$regularUrl['closure'][$cmd5]) ){
+            self::$thisRule['rule'] = self::$rule[self::$regularUrl['changeUrl'][$cpmd5]] ??  self::$rule[self::$regularUrl['changeUrl'][$cmd5]];
+            self::changeGetValue(self::$thisRule['rule']['params']); // 保存GET参数
+
+            $url  = self::$thisRule['rule']['url'] . ($params ? '/s/' . $params : '');
+
+         }
+
+        return $url ?? $uri;
     }
 
-    // 获取改写路径
-    public static function getRouteChangeUrl($uri, $params = '')
+    /**
+     * 根据原始路径获取改写路径
+     * @date   2019-12-19T13:54:22+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $uri    [原始路径]
+     * @param  string                   $params [参数]
+     * @return [type]                   [description]
+     */
+    public static function getRouteChangeUrl(string $uri, $params = '')
     {
 
         list($changeUrl, $params) = self::parseRouteUri($uri);
 
-        // 原始地址+参数匹配 完全匹配
-        $keyMD5 = md5($changeUrl . $params);
-        if (isset(self::$regularUrl['url'][$keyMD5])) {
-            $rule = &self::$rule[self::$regularUrl['url'][$keyMD5]];
-            self::changeGetValue($rule['params']); // 保存GET信息
-            if ($rule['change_url']) {
-                $url = $rule['change_url'] . $rule['suffix'];
-            } else {
-                $url = $rule['change_url'];
-            }
+        $cpmd5 = md5($changeUrl.$params); // 参数+地址匹配
+        $cmd5  = md5($changeUrl); // 纯地址匹配
 
+        if(isset(self::$regularUrl['url'][$cpmd5]) || isset(self::$regularUrl['url'][$cmd5])){
+            self::$thisRule['rule'] = self::$rule[self::$regularUrl['url'][$cpmd5]] ??  self::$rule[self::$regularUrl['url'][$cmd5]];
+            self::changeGetValue(self::$thisRule['rule']['params']); // 保存GET信息
+            // 过滤多余的“/” 存在参数则传参数 存在后缀则添加后缀
+            $url = '/' . ltrim((self::$thisRule['rule']['change_url'] . ($params ? '/s/' . $params : '') . self::$thisRule['rule']['suffix']), '/');
         }
-
-        // 若完全匹配不存在 则不匹配参数只匹配路径  部分匹配
-        if (!isset($url)) {
-            $keyMD5 = md5($changeUrl);
-            if (isset(self::$regularUrl['url'][$keyMD5])) {
-                $rule = &self::$rule[self::$regularUrl['url'][$keyMD5]];
-                // 增加自带参数 过来 多"/"情况
-                $url = '/' . ltrim(($rule['change_url'] . ($params ? '/s/' . $params : '') . $rule['suffix']), '/');
-
-            }
-        }
-
-        return isset($url) ? $url : $uri;
+         
+        return $url ?? $uri;
     }
 
     // 获取当前路由信息
@@ -195,14 +225,14 @@ class Route
         return self::$thisRule;
     }
 
-    //获取直接参数
-    private static function initValue($flag, $value)
+    // 获取直接参数
+    private static function initValue(string $flag, $value)
     {
         $res = (isset($_GET[$flag]) && $_GET[$flag] ? strip_tags($_GET[$flag]) : $value);
         return $res;
     }
 
-    //解析路由
+    // 解析路由
     private static function parseUri()
     {
         //去除urldecode转码 转码会导致get参数 带/解析错误
@@ -249,7 +279,7 @@ class Route
      *                                           isGet:是否保存GET值 默认不保存
      * @return [type]                   [description]
      */
-    public static function changeGetValue($uri, $options = [])
+    public static function changeGetValue(string $uri, array $options = [])
     {
 
         $isGet = isset($options['isGet']) ? isset($options['isGet']) : false;

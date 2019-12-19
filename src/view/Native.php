@@ -25,9 +25,14 @@ class Native
 
     /** 执行程序 */
     public function parseFile()
-    {
-        // 图片路径不存在
-        if (!$this->config->view || $this->config->view == '') {
+    {   
+
+        // 如果长度超过255, 直接当模板内容返回
+        if (strlen($this->config->view) > 255) {
+            return $this->config->view;
+        }
+        // 不存在模板路径
+        elseif (!$this->config->view || $this->config->view == '') {
             $this->config->view   = $this->config->root . str_replace('.', DS, MODULE) . DS . parseName(CONTROLLER, false) . DS . ACTION . $this->config->suffix;
         }
 
@@ -64,23 +69,15 @@ class Native
     public function parseFileContent()
     {
 
-        // 如果长度超过255, 直接当模板内容返回
-        if (strlen($this->config->view) > 255) {
-            $this->content = $this->config->view;
-        }
-        // 如果不存在路径
-        elseif (!$this->config->view || $this->config->view == '') {
-            $this->content = file_get_contents($this->config->view);
-        }
         // 如果有模板后缀, 直接当绝对地址
-        elseif (strpos($this->config->view, $this->config->suffix) > 0) {
+        if (strpos($this->config->view, $this->config->suffix) > 0) {
             $this->content = file_get_contents($this->config->view);
         }
         // 如果文件存在, 直接返回文件内容
         elseif (is_file($this->config->view)) {
             $this->content = file_get_contents($this->config->view);
         } else {
-            throw new Exception('视图地址[' . $this->config->view . ']不存在 ');
+            throw new \Exception('视图地址[' . $this->config->view . ']不存在 ');
         }
     }
 

@@ -25,6 +25,7 @@ class HttpResource
         return self::$request;
     }
 
+    /** 获取请求类型 */
     public static function method()
     {
 
