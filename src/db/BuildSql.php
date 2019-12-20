@@ -89,10 +89,10 @@ class BuildSql
         try {
             $do = new PDO($this->parseDNS($config), $config['user'], $config['pwd']);
         } catch (\PDOException $e) {
-            $msg = $e->getMessage() . ' <br/>SQL Config:<br/>' . PHP_EOL;
+            $msg = $e->getMessage();
             if (Config::get('debug')) {
                 foreach ($config as $key => $value) {
-                    $msg .= $key . ' : <font style="color:red">' . $value . '</font><br/>' . PHP_EOL;
+                    $msg .= '['.$key . ':' . $value . '] ';
                 }
             }
             throw new Exception($msg);
