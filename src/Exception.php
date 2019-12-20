@@ -4,14 +4,24 @@
 //---------------------
 namespace denha;
 
+use denha\Config;
+use \Whoops\Handler\PrettyPageHandler;
+use \Whoops\Run as ErrorRun;
+
 class Exception extends \Exception
 {
-
     /**
      * 保存异常页面显示的额外Debug数据
      * @var array
      */
-    protected $data = array();
+    protected $data = [];
+
+    public static function run()
+    {
+        $whoops = new ErrorRun;
+        $whoops->prependHandler(new PrettyPageHandler);
+        $whoops->register();
+    }
 
     /**
      * 设置异常额外的Debug数据
