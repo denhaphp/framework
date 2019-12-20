@@ -31,17 +31,15 @@ class Native
         if (strlen($this->config->view) > 255) {
             return $this->config->view;
         }
-        // 不存在模板路径
-        elseif (!$this->config->view || $this->config->view == '') {
-            $this->config->view   = $this->config->root . str_replace('.', DS, MODULE) . DS . parseName(CONTROLLER, false) . DS . ACTION . $this->config->suffix;
-        }
 
+        $this->parseViewPath();  // 解析文件地址
+            
         // 缓存模板地址 [模板文件地址+模板文件修改时间md5]
-        $this->cacheTplPath = DATA_TPL_PATH . md5($this->config->view) . '.php';
+        $this->cacheTplPath = DATA_TPL_PATH . md5($this->config->view) . '.php';    
 
         // 存在缓存文件则直接取缓存文件
-        if (!is_file($this->cacheTplPath) || filemtime($this->config->view) != filemtime($this->cacheTplPath) ) {
-            $this->parseFileContent();  // 获取模板内容
+        if (!is_file($this->cacheTplPath)  || filemtime($this->config->view) != filemtime($this->cacheTplPath) ) {
+            $this->getContent();  // 获取模板内容
             $this->parseInclude(); // 解析include
             $this->parseForeach(); // 解析foreach
             $this->parseValue(); // 解析foreach
@@ -61,20 +59,38 @@ class Native
     }
 
     /**
+     * 解析文件地址
+     * @date   2019-12-20T16:19:06+0800
+     * @author ChenMingjiang
+     * @return [type]                   [description]
+     */
+    public function parseViewPath()
+    {
+
+        // 不存在模板路径
+        if (!$this->config->view || $this->config->view == '') {
+            $this->config->view   = $this->config->root . str_replace('.', DS, MODULE) . DS . parseName(CONTROLLER, false) . DS . ACTION . $this->config->suffix;
+        }
+        // 如果有模板后缀, 直接当绝对地址
+        elseif (strpos($this->config->view, $this->config->suffix) > 0) {
+            $this->config->view = $this->config->root.$this->config->view;
+        }
+        // 相对路径
+        elseif(stripos($this->config->view, '/') !== 0){
+            $this->config->view = $this->config->root.str_replace('.', DS, MODULE) . DS .$this->config->view.$this->config->suffix;
+        }
+
+    }
+
+    /**
      * 获取文件内容
      * @date   2019-12-17T13:43:45+0800
      * @author ChenMingjiang
      * @return [type]                   [description]
      */
-    public function parseFileContent()
-    {
+    public function getContent(){
 
-        // 如果有模板后缀, 直接当绝对地址
-        if (strpos($this->config->view, $this->config->suffix) > 0) {
-            $this->content = file_get_contents($this->config->view);
-        }
-        // 如果文件存在, 直接返回文件内容
-        elseif (is_file($this->config->view)) {
+        if (is_file($this->config->view)) {
             $this->content = file_get_contents($this->config->view);
         } else {
             throw new \Exception('视图地址[' . $this->config->view . ']不存在 ');
