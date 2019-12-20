@@ -7,9 +7,13 @@ namespace denha;
 class HttpResource
 {
     public static $request; // 请求资源
+    public static $instance; // 单例实例化;
 
     public function __construct()
-    {
+    {   
+
+        self::filterXss(); // 执行Xss过滤
+
         if (!self::$request) {
             self::$request['service']         = $_SERVER;
             self::$request['method']          = self::method();
@@ -19,6 +23,17 @@ class HttpResource
             self::$request['params']['files'] = self::files();
         }
     }
+
+    // 获取实例
+    public static function initInstance()
+    {
+        if(is_null(self::$instance)){
+            self::$instance = new HttpResource();
+        }
+
+        return self::$instance;
+    }
+    
 
     public function getRequest()
     {
@@ -276,5 +291,27 @@ class HttpResource
         }
 
         return $data;
+    }
+
+    /**
+     * 过滤GET POST参数
+     * @date   2017-07-26T17:20:10+0800
+     * @author ChenMingjiang
+     * @return [type]                   [description]
+     */
+    public static function filterXss()
+    {
+        $urlArr  = ['xss' => '\=\+\/v(?:8|9|\+|\/)|\%0acontent\-(?:id|location|type|transfer\-encoding)'];
+        $argsArr = ['xss' => '[\'\\\'\;\*\<\>].*\bon[a-zA-Z]{3,15}[\s\\r\\n\\v\\f]*\=|\b(?:expression)\(|\<script[\s\\\\\/]|\<\!\[cdata\[|\b(?:eval|alert|prompt|msgbox)\s*\(|url\((?:\#|data|javascript)', 'sql' => '[^\{\s]{1}(\s|\b)+(?:select\b|update\b|insert(?:(\/\*.*?\*\/)|(\s)|(\+))+into\b).+?(?:from\b|set\b)|[^\{\s]{1}(\s|\b)+(?:create|delete|drop|truncate|rename|desc)(?:(\/\*.*?\*\/)|(\s)|(\+))+(?:table\b|from\b|database\b)|into(?:(\/\*.*?\*\/)|\s|\+)+(?:dump|out)file\b|\bsleep\([\s]*[\d]+[\s]*\)|benchmark\(([^\,]*)\,([^\,]*)\)|(?:declare|set|select)\b.*@|union\b.*(?:select|all)\b|(?:select|update|insert|create|delete|drop|grant|truncate|rename|exec|desc|from|table|database|set|where)\b.*(charset|ascii|bin|char|uncompress|concat|concat_ws|conv|export_set|hex|instr|left|load_file|locate|mid|sub|substring|oct|reverse|right|unhex)\(|(?:master\.\.sysdatabases|msysaccessobjects|msysqueries|sysmodules|mysql\.db|sys\.database_name|information_schema\.|sysobjects|sp_makewebtask|xp_cmdshell|sp_oamethod|sp_addextendedproc|sp_oacreate|xp_regread|sys\.dbms_export_extension)', 'other' => '\.\.[\\\\\/].*\%00([^0-9a-fA-F]|$)|%00[\'\\\'\.]'];
+
+        $httpReferer = empty($_SERVER['HTTP_REFERER']) ? [] : [$_SERVER['HTTP_REFERER']];
+        $queryString = empty($_SERVER['QUERY_STRING']) ? [] : [$_SERVER['QUERY_STRING']];
+
+        GSF($queryString, $urlArr);
+        GSF($httpReferer, $argsArr);
+        GSF($_GET, $argsArr);
+        GSF($_POST, $argsArr);
+        GSF($_COOKIE, $argsArr);
+
     }
 }

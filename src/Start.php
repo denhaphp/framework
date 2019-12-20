@@ -2,12 +2,13 @@
 namespace denha;
 
 use denha\Config;
+use denha\Exception;
+use denha\HttpResource;
 use \ReflectionClass;
 use \ReflectionMethod;
 
 class Start
 {
-    public static $client;
     public static $config           = [];
     public static $httpResource     = [];
     public static $methodDocComment = ''; // 当前运行方法注解
@@ -22,30 +23,28 @@ class Start
      */
     public static function up()
     {
-
-        self::$client = APP_CONFIG;
         // 获取配置文档信息
         self::$config = array_merge(Config::includes(), (array) Config::includes('config.' . APP . '.php'));
 
-        register_shutdown_function('denha\Trace::catchError');
-        set_error_handler('denha\Trace::catchNotice');
-        set_exception_handler('denha\Trace::catchApp');
-        error_reporting(0);
+        Exception::run(); // 加载错误面板
+
+        HttpResource::initInstance(); // 请求资源
+        
+        self::makeRouteRun(); // 运行路由
 
         Start::checkDisk(); //检测磁盘容量
+    }
 
-        Start::filter(); //过滤
+    
+    public static function makeRouteRun()
+    {
+        $class = Route::main(); //解析路由
 
-        $class  = Route::main(); //解析路由
         $action = lcfirst(parsename(ACTION, 1)); // 方法名称
 
-        self::$httpResource = new HttpResource(); // 请求资源
-        $request            = self::$httpResource->getRequest();
-
         $object = new ReflectionClass($class); // 获取类信息
-
         // 进入post提交方法
-        if (($request['method'] == 'POST' || $request['method'] == 'AJAX') && $object->hasMethod($action . 'Post')) {
+        if ((HttpResource::$request['method'] == 'POST') && $object->hasMethod($action . 'Post')) {
             $methodAction = $action . 'Post';
         } else {
             $methodAction = $action;
@@ -58,8 +57,6 @@ class Start
             throw new Exception(Route::$class . ' NOT PUBLIC [ ' . $methodAction . ' ] ACTION');
         }
 
-        self::$methodDocComment = $method->getDocComment(); // 保存方法注解信息
-
         $params = [];
         foreach ($method->getParameters() as $item) {
             if ($request['method'] == 'POST' && isset($request['params']['post'][$item->name])) {
@@ -71,29 +68,11 @@ class Start
 
         $method->invokeArgs(new $class(), $params);
 
-    }
-
-    /**
-     * 过滤GET POST参数
-     * @date   2017-07-26T17:20:10+0800
-     * @author ChenMingjiang
-     * @return [type]                   [description]
-     */
-    public static function filter()
-    {
-        $urlArr  = ['xss' => '\=\+\/v(?:8|9|\+|\/)|\%0acontent\-(?:id|location|type|transfer\-encoding)'];
-        $argsArr = ['xss' => '[\'\\\'\;\*\<\>].*\bon[a-zA-Z]{3,15}[\s\\r\\n\\v\\f]*\=|\b(?:expression)\(|\<script[\s\\\\\/]|\<\!\[cdata\[|\b(?:eval|alert|prompt|msgbox)\s*\(|url\((?:\#|data|javascript)', 'sql' => '[^\{\s]{1}(\s|\b)+(?:select\b|update\b|insert(?:(\/\*.*?\*\/)|(\s)|(\+))+into\b).+?(?:from\b|set\b)|[^\{\s]{1}(\s|\b)+(?:create|delete|drop|truncate|rename|desc)(?:(\/\*.*?\*\/)|(\s)|(\+))+(?:table\b|from\b|database\b)|into(?:(\/\*.*?\*\/)|\s|\+)+(?:dump|out)file\b|\bsleep\([\s]*[\d]+[\s]*\)|benchmark\(([^\,]*)\,([^\,]*)\)|(?:declare|set|select)\b.*@|union\b.*(?:select|all)\b|(?:select|update|insert|create|delete|drop|grant|truncate|rename|exec|desc|from|table|database|set|where)\b.*(charset|ascii|bin|char|uncompress|concat|concat_ws|conv|export_set|hex|instr|left|load_file|locate|mid|sub|substring|oct|reverse|right|unhex)\(|(?:master\.\.sysdatabases|msysaccessobjects|msysqueries|sysmodules|mysql\.db|sys\.database_name|information_schema\.|sysobjects|sp_makewebtask|xp_cmdshell|sp_oamethod|sp_addextendedproc|sp_oacreate|xp_regread|sys\.dbms_export_extension)', 'other' => '\.\.[\\\\\/].*\%00([^0-9a-fA-F]|$)|%00[\'\\\'\.]'];
-
-        $httpReferer = empty($_SERVER['HTTP_REFERER']) ? [] : [$_SERVER['HTTP_REFERER']];
-        $queryString = empty($_SERVER['QUERY_STRING']) ? [] : [$_SERVER['QUERY_STRING']];
-
-        GSF($queryString, $urlArr);
-        GSF($httpReferer, $argsArr);
-        GSF($_GET, $argsArr);
-        GSF($_POST, $argsArr);
-        GSF($_COOKIE, $argsArr);
+        self::$methodDocComment = $method->getDocComment(); // 保存方法注解信息
 
     }
+
+    
 
     //检测磁盘容量
     private static function checkDisk()
