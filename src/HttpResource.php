@@ -2,21 +2,28 @@
 //------------------------
 //· Http资源类
 //-------------------------
+
+declare (strict_types = 1);
+
 namespace denha;
 
 class HttpResource
 {
     public static $request; // 请求资源
     public static $instance; // 单例实例化;
+    
+    private static $isXss = false;
 
     public function __construct()
-    {   
-
-        self::filterXss(); // 执行Xss过滤
+    {      
+        if(!self::$isXss){
+            self::filterXss(); // 执行Xss过滤
+            self::$isXss = true;
+        } 
 
         if (!self::$request) {
             self::$request['service']         = $_SERVER;
-            self::$request['method']          = self::method();
+            self::$request['method']          = self::getMethod();
             self::$request['params']['get']   = self::get();
             self::$request['params']['post']  = self::post();
             self::$request['params']['put']   = self::put();
@@ -34,16 +41,43 @@ class HttpResource
         return self::$instance;
     }
     
+    public static function isAjax()
+    {
+        if(isset($_SERVER['HTTP_X_REQUESTED_WITH']) && (strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') || !empty($_POST['ajax']) || !empty($_GET['ajax']) ){
+            return true;
+        }
 
-    public function getRequest()
+        return false;
+    }
+
+    public static function getHost()
+    {
+        return  isset($_SERVER['HTTP_HOST']) ? self::getHttpType() . $_SERVER['HTTP_HOST'] : '';
+    }
+
+    public static function getUrl()
+    {
+       $url =  isset($_SERVER['PHP_SELF']) ? self::getHost() . $_SERVER['PHP_SELF'] : '';
+       $url .=  !empty($_SERVER['QUERY_STRING']) ?  '?'.$_SERVER['QUERY_STRING'] : '';
+
+       return $url;
+    }
+
+    public static function getHttpType()
+    {
+        $type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+
+       return $type;
+    }
+
+    public static function getRequest()
     {
         return self::$request;
     }
 
     /** 获取请求类型 */
-    public static function method()
+    public static function getMethod()
     {
-
         if (PHP_SAPI == 'cli') {
             $method = 'CLI';
         }
