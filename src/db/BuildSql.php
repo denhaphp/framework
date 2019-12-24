@@ -8,6 +8,7 @@ use denha;
 use denha\Config;
 use denha\Route;
 use denha\Trace;
+use denha\Log;
 use \Exception;
 use \PDO;
 
@@ -20,7 +21,6 @@ class BuildSql
 
     public static $link; // 当前链接符
     public static $id; // 当前链接配置ID
-    public static $PS = []; //  记录 QPS TPS 参数
 
     public $options; // 记录参数信息$
     public $bulid; // 记录构造Sql;
@@ -130,16 +130,6 @@ class BuildSql
         $this->options['tablepre'] = $this->config['prefix'];
         $this->options['database'] = $this->config['name'];
 
-        // 存入调试信息中
-        if (Config::get('trace') && $this->config['ps_sql']) {
-            if (!isset(self::$PS[$id])) {
-                self::$PS[$id]['QPS'] = $this->getQPS();
-                self::$PS[$id]['TPS'] = $this->getQPS();
-                // 记录QPS TPS 调试信息
-                Trace::addSqlInfo(['PS' => 'QPS:' . self::$PS[$id]['QPS'] . ' TPS:' . self::$PS[$id]['TPS']]);
-            }
-        }
-
         return $this;
     }
 
@@ -166,50 +156,6 @@ class BuildSql
         ];
 
         $this->connect();
-    }
-
-    public function getQPS()
-    {
-        $result = $this->query("SHOW GLOBAL STATUS LIKE 'Questions'");
-        if ($result) {
-            $questions = (int) $result->fetch(PDO::FETCH_NUM)[1];
-        }
-
-        $result = $this->query("SHOW GLOBAL STATUS LIKE 'Uptime'");
-        if ($result) {
-            $uptime = (int) $result->fetch(PDO::FETCH_NUM)[1];
-        }
-
-        if (!$questions) {
-            return 0;
-        }
-
-        return ($questions / $uptime);
-
-    }
-
-    public function getTPS()
-    {
-
-        $result = $this->query("SHOW GLOBAL STATUS LIKE 'Com_commit'");
-        if ($result) {
-            $commit = (int) $result->fetch(PDO::FETCH_NUM)[1];
-        }
-        $result = $this->query("SHOW GLOBAL STATUS LIKE 'Com_rollback'");
-        if ($result) {
-            $rollback = (int) $result->fetch(PDO::FETCH_NUM)[1];
-        }
-        $result = $this->query("SHOW GLOBAL STATUS LIKE 'Uptime'");
-        if ($result) {
-            $uptime = (int) $result->fetch(PDO::FETCH_NUM)[1];
-        }
-
-        if ($commit + $rollback <= 0) {
-            return 0;
-        }
-
-        return (($commit + $rollback) / $uptime);
-
     }
 
     /**
@@ -1089,29 +1035,21 @@ class BuildSql
         // 执行成功
         if ($result) {
 
-            // 存入调试信息中
+            // 存入调试信息中和日志记录中
             Trace::addSqlInfo($this->sqlInfo);
-            // 存入文件中
-            if ($this->config['save_log']) {
-                $this->addSqlLog();
-            }
 
             return $result;
+
         } else {
 
+            list($errorCode, $errorNumber, $errorMsg) = self::$link->errorInfo();
             // 存入文件
-            if ($this->config['error_log']) {
-                $this->addErrorSqlLog();
+            if ($this->config['error_log'] ||　Config::get('debug')) {
+                Log::notice('SQL ERROR :' . $errorCode . ' ' . $errorMsg . ' SQL :  ' . $this->bulid['sql']);
             }
 
             if (Config::get('debug')) {
-                list($errorCode, $errorNumber, $errorMsg) = self::$link->errorInfo();
-                throw new Exception('[<font color="red">SQL ERROR :' . $errorCode . ' ' . $errorMsg . ' </font>] SQL :  ' . $this->bulid['sql'] . PHP_EOL);
-            }
-
-            if (Config::get('trace')) {
-                Trace::addErrorInfo('[SQL ERROR] ' . $this->bulid['sql']);
-
+                throw new Exception('SQL ERROR :' . $errorCode . ' ' . $errorMsg . ' SQL :  ' . $this->bulid['sql'] . PHP_EOL);
             }
 
             return false;
@@ -1120,70 +1058,49 @@ class BuildSql
 
     }
 
-    /** 保存错误SQL记录 */
-    public function addErrorSqlLog()
-    {
+    // /**
+    //  * 保存sql记录
+    //  * @date   2017-10-18T13:45:16+0800
+    //  * @author ChenMingjiang
+    //  * @return [type]                   [description]
+    //  */
+    // public function addSqlLog()
+    // {
+    //     //创建文件夹
+    //     is_dir(DATA_SQL_PATH) ? '' : mkdir(DATA_SQL_PATH, 0755, true);
 
-        $path = DATA_SQL_PATH . $this->options['database'] . DS;
-        is_dir($path) ? '' : mkdir($path, 0755, true);
+    //     $info = '------ ' . $this->sqlInfo['time'];
+    //     $info .= ' | ' . date('Y-m-d H:i:s', TIME);
+    //     $info .= ' | ip:' . Config::IP();
+    //     $info .= ' | Url:' . URL . '/' . Route::$uri;
+    //     $info .= PHP_EOL . PHP_EOL;
 
-        $path .= 'error_' . date('Y_m_d', TIME) . '.text';
+    //     // 如果存在sql信息 并且开启日志记录
+    //     if ($this->sqlInfo && $this->config['save_log']) {
+    //         $basePath = DATA_SQL_PATH . $this->options['database'] . DS;
+    //         is_dir($basePath) ? '' : mkdir($basePath, 0755, true);
 
-        $info = '------ ' . $this->sqlInfo['time'];
-        $info .= ' | ' . date('Y-m-d H:i:s', TIME);
-        $info .= ' | ip:' . Config::IP();
-        $info .= ' | Url:' . URL . '/' . Route::$uri;
-        $info .= PHP_EOL;
+    //         $content = $this->sqlInfo['sql'] . PHP_EOL;
 
-        $content = $this->sqlInfo['sql'] . ';' . PHP_EOL . '--------------' . PHP_EOL;
+    //         // 记录explain
+    //         if ($this->config['sql_explain'] && isset($this->sqlInfo['explain'])) {
+    //             foreach ($this->sqlInfo['explain'] as $explain) {
+    //                 $content .= json_encode($explain) . PHP_EOL;
+    //             }
+    //         }
 
-        error_log($content . $info, 3, $path);
+    //         $path = $basePath . (isset($this->options['type']) ? strtolower($this->options['type']) : 'other');
+    //         $path .= '_' . date('Y_m_d', TIME) . '.text';
 
-    }
+    //         // 记录慢sql
+    //         if ($this->config['slow_log']) {
+    //             if ($this->sqlInfo['time'] > $this->config['slow_time']) {
+    //                 $path = $basePath . 'slow_' . date('Y_m_d', TIME) . '.text';
+    //             }
+    //         }
 
-    /**
-     * 保存sql记录
-     * @date   2017-10-18T13:45:16+0800
-     * @author ChenMingjiang
-     * @return [type]                   [description]
-     */
-    public function addSqlLog()
-    {
-        //创建文件夹
-        is_dir(DATA_SQL_PATH) ? '' : mkdir(DATA_SQL_PATH, 0755, true);
-
-        $info = '------ ' . $this->sqlInfo['time'];
-        $info .= ' | ' . date('Y-m-d H:i:s', TIME);
-        $info .= ' | ip:' . Config::IP();
-        $info .= ' | Url:' . URL . '/' . Route::$uri;
-        $info .= PHP_EOL . PHP_EOL;
-
-        // 如果存在sql信息 并且开启日志记录
-        if ($this->sqlInfo && $this->config['save_log']) {
-            $basePath = DATA_SQL_PATH . $this->options['database'] . DS;
-            is_dir($basePath) ? '' : mkdir($basePath, 0755, true);
-
-            $content = $this->sqlInfo['sql'] . PHP_EOL;
-
-            // 记录explain
-            if ($this->config['sql_explain'] && isset($this->sqlInfo['explain'])) {
-                foreach ($this->sqlInfo['explain'] as $explain) {
-                    $content .= json_encode($explain) . PHP_EOL;
-                }
-            }
-
-            $path = $basePath . (isset($this->options['type']) ? strtolower($this->options['type']) : 'other');
-            $path .= '_' . date('Y_m_d', TIME) . '.text';
-
-            // 记录慢sql
-            if ($this->config['slow_log']) {
-                if ($this->sqlInfo['time'] > $this->config['slow_time']) {
-                    $path = $basePath . 'slow_' . date('Y_m_d', TIME) . '.text';
-                }
-            }
-
-            error_log($content . $info, 3, $path);
-        }
-    }
+    //         error_log($content . $info, 3, $path);
+    //     }
+    // }
 
 }
