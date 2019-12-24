@@ -1,9 +1,12 @@
 <?php
+declare (strict_types = 1);
+
 namespace denha;
 
 use denha\Config;
 use denha\Exception;
 use denha\HttpResource;
+use denha\Log;
 use \ReflectionClass;
 use \ReflectionMethod;
 
@@ -23,22 +26,26 @@ class Start
      */
     public static function up()
     {
+
         // 获取配置文档信息
-        self::$config = array_merge(Config::includes(), (array) Config::includes('config.' . APP . '.php'));
+        self::$config = Config::includes();
 
-        Exception::run(); // 加载错误面板
+        Exception::run(HttpResource::initInstance(), self::$config); // 加载错误面板
 
-        HttpResource::initInstance(); // 请求资源
-        
+        // 日志记录
+        Log::info('-----------------------------------------------');
+        Log::info('URL:' . HttpResource::getUrl() . ' Method:' . HttpResource::getMethod());
+
         self::makeRouteRun(); // 运行路由
 
-        Start::checkDisk(); //检测磁盘容量
     }
 
-    
     public static function makeRouteRun()
     {
         $class = Route::main(); //解析路由
+
+        // 日志记录
+        Log::info('Crontroller:' . MODULE . DS . CONTROLLER . DS . ACTION);
 
         $action = lcfirst(parsename(ACTION, 1)); // 方法名称
 
@@ -70,21 +77,6 @@ class Start
 
         self::$methodDocComment = $method->getDocComment(); // 保存方法注解信息
 
-    }
-
-    
-
-    //检测磁盘容量
-    private static function checkDisk()
-    {
-        if (self::$config['check_disk']) {
-
-            $free = number_format(DISK_TOTAL_SPACE / 1024 / 1024 / 1024, 2);
-            if (self::$config['disk_space'] >= $free) {
-                $title = URL . ' 磁盘容量不足' . self::$config['disk_space'] . 'G ip:' . getIP() . ' ' . $_SERVER['SERVER_PROTOCOL'];
-                dao('Mail')->send(self::$config['send_mail'], $title, $title, ['save_log' => false]);
-            }
-        }
     }
 
 }
