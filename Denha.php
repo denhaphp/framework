@@ -19,31 +19,7 @@ define('VIEW_PATH', ROOT_PATH . 'resources' . DS); // 资源目录
 define('PUBLIC_PATH', ROOT_PATH . 'public' . DS); // 公共地址目录
 define('EXT', '.php'); //文件后缀
 
-define('HTTP_TYPE', ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://'); // HTTP OR HTTPS
-define('URL', isset($_SERVER['HTTP_HOST']) ? HTTP_TYPE . $_SERVER['HTTP_HOST'] : ''); // 当前Url
-
-define('IS_CGI', (0 === strpos(PHP_SAPI, 'cgi')) || (false !== strpos(PHP_SAPI, 'fcgi')) ? true : false);
-define('IS_WIN', stristr(PHP_OS, 'WIN') ? true : false);
-define('IS_CLI', PHP_SAPI == 'cli' ? true : false);
-
-if (!IS_CLI) {
-    define('REQUEST_METHOD', $_SERVER['REQUEST_METHOD']);
-    define('IS_GET', REQUEST_METHOD == 'GET' ? true : false);
-    define('IS_POST', REQUEST_METHOD == 'POST' ? true : false);
-    define('IS_PUT', REQUEST_METHOD == 'PUT' ? true : false);
-    define('IS_DELETE', REQUEST_METHOD == 'DELETE' ? true : false);
-    define('IS_AJAX', (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && (strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest')) || !empty($_POST['ajax']) || !empty($_GET['ajax']) ? true : false);
-} else {
-    define('IS_GET', false);
-    define('IS_POST', false);
-    define('IS_PUT', false);
-    define('IS_DELETE', false);
-    define('IS_AJAX', false);
-}
-
 define('TIME', $_SERVER['REQUEST_TIME']); //系统时间
 define('START_USE_MENUS', memory_get_usage()); // 内存使用初始情况
-define('DISK_TOTAL_SPACE', disk_total_space(ROOT_PATH)); // 程序所在硬盘总容量
-define('DISK_FREE_SPACE', disk_free_space(ROOT_PATH)); // 程序所在硬盘使用容量
 
 require_once VENDOR_PATH . 'autoload.php';
