@@ -2,6 +2,9 @@
 //------------------------
 //· 控制器类
 //---------------------
+
+declare (strict_types = 1);
+
 namespace denha;
 
 use denha\HttpResource;
@@ -27,7 +30,6 @@ class Controller
         } else {
             self::$assign[$name] = $value;
         }
-
     }
 
     /**

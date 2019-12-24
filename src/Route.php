@@ -2,6 +2,9 @@
 //------------------------
 //· 路由类
 //---------------------
+
+declare (strict_types = 1);
+
 namespace denha;
 
 use denha\Config;
@@ -20,6 +23,10 @@ class Route
     ];
     public static $id         = 0;
     public static $regularUrl = []; // 路由规则数组
+
+    public function __construct(){
+        
+    }
 
     // 执行主体
     public static function main()
@@ -178,7 +185,11 @@ class Route
 
         // 如果存在闭包信息则直接返回
         if(isset(self::$regularUrl['closure'][$cpmd5]) || isset(self::$regularUrl['closure'][$cmd5]) ){
-            die(call_user_func(self::$rule[self::$regularUrl['closure'][$cpmd5]]['change_url'] ?? self::$rule[self::$regularUrl['closure'][$cmd5]]['change_url']));
+            $funs = self::$rule[self::$regularUrl['closure'][$cpmd5]]['change_url'] ?? self::$rule[self::$regularUrl['closure'][$cmd5]]['change_url'];
+
+            if(is_callable($funs)){
+                die(call_user_func($funs));
+            }
         }
 
         // 匹配changeUrl

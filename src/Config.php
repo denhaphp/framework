@@ -2,6 +2,9 @@
 //------------------------
 //· 配置类
 //-------------------------
+
+declare (strict_types = 1);
+
 namespace denha;
 
 class Config

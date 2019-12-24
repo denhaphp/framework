@@ -2,6 +2,9 @@
 //------------------------
 //· 消息提醒
 //---------------------
+
+declare (strict_types = 1);
+
 namespace denha;
 
 class HttpTrace

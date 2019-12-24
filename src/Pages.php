@@ -2,6 +2,9 @@
 //------------------------
 //· 分页模块
 //---------------------
+
+declare (strict_types = 1);
+
 namespace denha;
 
 class Pages
