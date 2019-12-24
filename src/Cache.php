@@ -2,6 +2,9 @@
 //------------------------
 //· 缓存类
 //-------------------------
+
+declare (strict_types = 1);
+
 namespace denha;
 
 use denha\Config;
