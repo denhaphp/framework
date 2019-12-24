@@ -573,7 +573,7 @@ if (!function_exists('view')) {
 
         $Controller = new Controller();
 
-        $this->show($viewPath = '', $viewParamData = [], $options = []);
+        $this->show($viewPath, $viewParamData, $options);
     }
 }
 
@@ -849,7 +849,7 @@ if (!function_exists('url')) {
     function url($location = null, $params = [], $options = [])
     {
 
-        $hostUrl = isset($options['host']) ? $options['host'] : URL; // 前缀域名
+        $hostUrl = isset($options['host']) ? $options['host'] : HttpResource::getHost(); // 前缀域名
         $isGet   = isset($options['is_get']) ? $options['is_get'] : true; // 开启伪静态 true开启 false关闭
 
         // 外链直接返回
