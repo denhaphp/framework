@@ -6,57 +6,82 @@ namespace denha\db;
 
 use denha;
 use denha\Config;
-use denha\Route;
-use denha\Trace;
 use denha\Log;
+use denha\Trace;
 use \Exception;
 use \PDO;
 
 class BuildSql
 {
-
-    private static $dbConfig;
+    private static $configs;
     private static $instance; // 单例实例化;
     private static $do; // 数据库操作符
 
-    public static $link; // 当前链接符
-    public static $id; // 当前链接配置ID
+    public $link; // 当前链接符
+    public $id; // 当前链接配置ID
 
     public $options; // 记录参数信息$
     public $bulid; // 记录构造Sql;
+
+    /** @var [power] [读写类型权限] */
+    private $power = [
+        'read'  => ['SELECT', 'COUNT'],
+        'write' => ['INSERT', 'UPDATE', 'DELETE'],
+    ];
 
     private $config; //
 
     private function __construct(array $dbConfig = [])
     {
-        $this->config($dbConfig);
+        $this->setConfigs($dbConfig);
 
     }
 
     // 单例实例化 避免重复New占用资源
-    public static function getInstance(array $dbConfig = [])
+    public static function getInstance(array $config = [])
     {
         if (is_null(self::$instance)) {
-            self::$instance = new BuildSql($dbConfig);
+            self::$instance = new BuildSql($config);
         }
 
         return self::$instance;
 
     }
 
-    public function config(array $dbConfig = [])
+    public function getConfig()
     {
-        if ($dbConfig) {
-            self::$dbConfig = $dbConfig;
+        return $this->config;
+    }
+
+    /** 数据库配置读取 */
+    public function setConfig(array $config)
+    {
+        $readWritePower = $config['read_write_power'] ?? 0;
+        $hash           = md5(json_encode($config));
+        $config['dns']  = $this->parseDNS($config);
+
+        if ($readWritePower == 0) {
+            self::$do[1][$hash] = $config;
+            self::$do[2][$hash] = $config;
         } else {
-            self::$dbConfig = Config::includes('db.php')['config'];
+            self::$do[$readWritePower][$hash] = $config;
         }
 
-        foreach (self::$dbConfig as $key => $value) {
-            $hash = md5(json_encode(self::$dbConfig[$key]));
-            if (!isset(self::$do[$hash])) {
-                self::$do[$hash] = $this->open($value);
-            }
+        return  $this;
+    }
+
+    public function setConfigs(array $dbConfig = [])
+    {
+        if ($dbConfig) {
+            $this->setConfig($item);
+        }
+
+        if (!self::$configs) {
+            self::$configs = Config::includes(Config::get('db_file'))['config'];
+        }
+
+        foreach (self::$configs as $item) {
+            $this->setConfig($item);
         }
 
     }
@@ -92,7 +117,7 @@ class BuildSql
             $msg = $e->getMessage();
             if (Config::get('debug')) {
                 foreach ($config as $key => $value) {
-                    $msg .= '['.$key . ':' . $value . '] ';
+                    $msg .= '[' . $key . ':' . $value . '] ';
                 }
             }
             throw new Exception($msg);
@@ -115,22 +140,63 @@ class BuildSql
     }
 
     /** 链接 */
-    public function connect(int $id = 0)
+    public function connect()
     {
 
-        self::$id   = $id;
-        self::$link = self::$do[md5(json_encode(self::$dbConfig[$id]))];
+        // 根据Sql类型选择链接数据库
+        in_array($this->options['type'], $this->power['write']) ? $this->connectWrite() : $this->connectRead();
 
-        if (!self::$link->getAttribute(PDO::ATTR_SERVER_INFO)) {
-            throw new Exception('链接信息异常');
+        if (!$this->link->getAttribute(PDO::ATTR_SERVER_INFO)) {
+            throw new Exception('link infomation abnor');
         }
 
-        $this->config              = self::$dbConfig[$id];
-        $this->tablepre            = $this->config['prefix'];
-        $this->options['tablepre'] = $this->config['prefix'];
-        $this->options['database'] = $this->config['name'];
-
         return $this;
+    }
+
+    /** 写数据库连接 */
+    public function connectWrite()
+    {
+        if (!self::$do[1]) {
+            throw new Exception('error: database confg not find write power config,plase set read_write_power either 0 or 1 also add new config');
+        }
+
+        // 判断是否存在
+        if (!isset($this->config['write'])) {
+            $this->config['write'] = self::$do[1][array_rand(self::$do[1])];
+            // 判断是否存在PDO
+            if (!isset($this->config['write']['pdo'])) {
+                $this->config['write']['pdo'] = $this->open($this->config['write']);
+            }
+        }
+
+        $this->link = $this->config['write']['pdo'];
+
+        $this->options['tablepre'] = $this->config['write']['prefix'];
+        $this->options['database'] = $this->config['write']['name'];
+
+    }
+
+    /** 读数据库连接 */
+    public function connectRead()
+    {
+        if (!self::$do[1]) {
+            throw new Exception('error: database confg not find read power config,plase set read_write_power either 0 or 2 also add new config');
+        }
+
+        // 判断是否存在
+        if (!isset($this->config['read'])) {
+            $this->config['read'] = self::$do[2][array_rand(self::$do[2])];
+            // 判断是否存在PDO
+            if (!isset($this->config['read']['pdo'])) {
+                $this->config['read']['pdo'] = $this->open($this->config['read']);
+            }
+        }
+
+        $this->link = $this->config['read']['pdo'];
+
+        $this->options['tablepre'] = $this->config['read']['prefix'];
+        $this->options['database'] = $this->config['read']['name'];
+
     }
 
     /** 构造Sql初始化 */
@@ -148,6 +214,7 @@ class BuildSql
         ];
 
         $this->options = [
+            'type'  => '',
             'data'  => [],
             'field' => [],
             'order' => [],
@@ -155,7 +222,6 @@ class BuildSql
             'table' => [],
         ];
 
-        $this->connect();
     }
 
     /**
@@ -182,56 +248,18 @@ class BuildSql
      *                                  link：链接数据库配置ID
      * @return [type]                            [description]
      */
-    public function table(string $table, array $options = [])
+    public static function table(string $table, array $options = [])
     {
 
-        $link = isset($options['link']) ? $options['link'] : '';
+        self::getInstance(); // 实例化
 
-        // 初始化SQL参数
-        $this->init();
+        $isPrefix = $options['is_prefix'] ?: true;
+        $link     = $options['link'] ?: '';
 
-        // 链接其他数据库
-        if ($link) {
-            $this->connect($link);
-        }
+        self::$instance->init();
+        self::$instance->options['table'] = ['name' => $table, 'is_prefix' => $isPrefix];
 
-        $this->parseTable($table, $options); // 解析table
-
-        return $this;
-    }
-
-    public function parseTable($table, $options = []): string
-    {
-        $isTablepre = isset($options['is_tablepre']) ? $options['is_tablepre'] : true;
-
-        // 判断是否存在 as
-        if (stripos($table, ' as ') !== false) {
-            list($tableName, $tableAs) = explode(' AS ', str_replace(' as ', ' AS ', $table));
-        } else {
-            $tableName = $table;
-        }
-
-        $tableName = parseName(trim($tableName));
-        $tableAs   = isset($tableAs) ? trim($tableAs) : '';
-
-        $options['name']        = $isTablepre && $this->options['tablepre'] ? $this->options['tablepre'] . $tableName : $tableName;
-        $options['is_tablepre'] = $isTablepre;
-        $options['as']          = $tableAs;
-
-        if ($tableAs) {
-            $bulid = $options['name'] . ' AS ' . $tableAs;
-        } else {
-            $bulid = $options['name'];
-        }
-
-        // 保证 $this->options['table'] 唯一
-        if (empty($this->options['table'])) {
-            $this->options['table'] = $options;
-            $this->bulid['table']   = $bulid;
-        }
-
-        return $bulid;
-
+        return self::$instance;
     }
 
     /**
@@ -276,58 +304,6 @@ class BuildSql
         return $field;
     }
 
-    /** 解析查询条件 */
-    public function parseWhere(array $whereMap = []): string
-    {
-        $whereMap = $whereMap ? $whereMap : $this->options['map'];
-
-        if (count($whereMap) > 1) {
-            // 第一个OR出现
-            $orStart = true;
-            foreach ($whereMap as $kk => $vv) {
-                if (trim($vv[1]) == 'OR' && $orStart) {
-                    $orStart = false;
-                    // 存在上一条信息 则上一条增加一个 "("
-                    if ($kk > 0) {
-                        $whereMap[($kk - 1)][1] = $whereMap[($kk - 1)][1] . ' ( ';
-                    }
-                    // 否则当前信息增加一个 "("
-                    else {
-                        $whereMap[$kk][1] = $whereMap[$kk][1] . ' ( ';
-                    }
-                }
-
-                // 最后一个OR出现
-                if (trim($vv[1]) == 'AND' && !$orStart) {
-                    $orStart          = true;
-                    $whereMap[$kk][0] = $whereMap[$kk][0] . ' ) ';
-                }
-                // 最后一条数据
-                elseif (!$orStart && count($whereMap) == ($kk + 1)) {
-                    $orStart          = true;
-                    $whereMap[$kk][0] = $whereMap[$kk][0] . ' ) ';
-                }
-
-            }
-        }
-
-        $mapSql = ' WHERE ';
-        foreach ($whereMap as $key => $item) {
-
-            list($field, $link) = $item;
-            // if (array_key_last($whereMap) == $key) { PHP >= 7.3
-            // PHP <= 7.3
-            if (count($whereMap) - 1 == $key) {
-
-                $mapSql .= $field;
-            } else {
-                $mapSql .= $field . $link;
-            }
-        }
-
-        return $mapSql;
-    }
-
     /**
      * 查询条件
      * @date   2019-09-29T16:49:48+0800
@@ -364,8 +340,6 @@ class BuildSql
         // 批量处理数组
         if (is_array($where)) {
             foreach ($where as $mapField => $v) {
-                // 格式化字段
-                $mapField = $this->addFieldTag($mapField);
                 // 初始化连接符
                 $mapLink = 'AND';
 
@@ -398,9 +372,172 @@ class BuildSql
         return $this;
     }
 
+    /**
+     * 关联查询
+     * @date   2018-07-12T11:12:45+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $table   [description]
+     * @param  string                   $where   [description]
+     * @param  string                   $float   [description]
+     * @param  array                    $options [description]
+     * @return [type]                            [description]
+     */
+    public function join(string $table, $where = '', $float = 'left')
+    {
+
+        $this->options['join'][] = ['table' => $table, 'where' => $where, 'float' => $float];
+
+        return $this;
+    }
+
+    /**
+     * 查询数量
+     * @date   2017-03-19T16:18:13+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $limit [description]
+     * @return [type]                          [description]
+     */
+    public function limit(int $limit = 0, $pageSize = '')
+    {
+
+        $this->options['limit'] = ['offset' => $limit, 'pageSize' => $pageSize];
+
+        return $this;
+    }
+
+    /** 查询字段 */
+    public function field($field = '*')
+    {
+
+        if (!$field) {
+            return $this;
+        }
+
+        $this->options['field'] = is_array($field) ? $field : explode(',', $field);
+
+        return $this;
+    }
+
+    /** 编辑字段 */
+    public function setData($data, $exp = null, $value = null)
+    {
+        if ($exp !== null && $value === null) {
+            $data = [$data => $exp];
+        } elseif ($value !== null) {
+            $data = [$data => [$exp, $value]];
+        }
+
+        $data = is_array($data) ? $data : explode(',', $data);
+
+        $this->options['data'] = $data;
+
+        return $this;
+    }
+
+    /** 分组 */
+    public function group($value = '')
+    {
+
+        if (!$value) {
+            return $this;
+        }
+
+        $this->options['group'] = is_array($value) ? $value : explode(',', $value);
+
+        return $this;
+    }
+
+    /**
+     *
+     * 排序
+     * @date   2018-12-19T10:53:46+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $value [description]
+     * @return [type]                   [description]
+     */
+    public function order($field)
+    {
+        if (!$field) {
+            return $this;
+        }
+
+        // 分割逗号
+        if (!is_array($field) && stripos($field, '(') === false) {
+            $fields = explode(',', $field);
+        } elseif (is_array($field)) {
+            foreach ($field as $key => $value) {
+                $fields[] = $key . ' ' . $value;
+            }
+        } else {
+            $fields[] = $field;
+        }
+
+        $this->options['order'][] = $fields;
+
+        return $this;
+
+        // 分割字段 和排序类型
+        foreach ($fields as $key => $val) {
+            // 包含 () 的关键字
+            if (stripos($val, '(') !== false) {
+                $parseOrder[$key] = ' ' . $val;
+            } else {
+                list($field, $exp) = explode(' ', $val);
+                $parseOrder[$key]  = ' ' . $this->addFieldTag($field) . ' ' . $exp;
+            }
+        }
+
+        if ($parseOrder) {
+            $this->options['order'] = array_merge($parseOrder, $this->options['order'] ?: []);
+        }
+
+        return $this;
+    }
+
+    /**
+     * hvaing
+     * @date   2017-11-22T01:18:55+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $field [description]
+     * @return [type]                          [description]
+     */
+    public function having($field)
+    {
+        $this->options['having'] = $field;
+        return $this;
+    }
+
+    /** 解析表名 */
+    public function parseTable()
+    {
+
+        if (!$this->options['table']) {
+            throw new Exception('plase choose table name');
+        }
+
+        // 判断是否存在 as
+        if (stripos($this->options['table']['name'], ' as ') !== false) {
+            list($name, $as) = explode(' AS ', str_replace(' as ', ' AS ', $this->options['table']['name']));
+        } else {
+            $name = $this->options['table']['name'];
+        }
+
+        $name = parseName(trim($name));
+        $as   = isset($as) ? trim($as) : '';
+
+        $name = $this->options['table']['is_prefix'] && $this->options['tablepre'] ? $this->options['tablepre'] . $name : $name;
+
+        if (empty($this->bulid['table'])) {
+            $this->bulid['table'] = $as ? $name . ' AS ' . $as : $name;
+        }
+
+    }
+
     /** 处理查询条件 */
     public function parseMap($mapField, $mapExp, $mapValue, $mapLink = 'AND'): array
     {
+
+        $mapField = $this->addFieldTag($mapField); // 格式化字段
 
         $mapLink = ' ' . $mapLink . ' '; // 连接符
         $expRule = [
@@ -475,92 +612,111 @@ class BuildSql
         return [$map, $mapLink];
     }
 
-    /**
-     * 关联查询
-     * @date   2018-07-12T11:12:45+0800
-     * @author ChenMingjiang
-     * @param  [type]                   $table   [description]
-     * @param  string                   $where   [description]
-     * @param  string                   $float   [description]
-     * @param  array                    $options [description]
-     * @return [type]                            [description]
-     */
-    public function join(string $table, $where = '', $float = 'left')
+    /** 解析查询条件 */
+    public function parseWhere(array $whereMap = []): string
     {
+        $whereMap = $whereMap ? $whereMap : $this->options['map'];
 
-        if ($table == $this->options['table']['name']) {
-            throw new Exception('表与关联表名字相同');
+        if (count($whereMap) > 1) {
+            // 第一个OR出现
+            $orStart = true;
+            foreach ($whereMap as $kk => $vv) {
+                if (trim($vv[1]) == 'OR' && $orStart) {
+                    $orStart = false;
+                    // 存在上一条信息 则上一条增加一个 "("
+                    if ($kk > 0) {
+                        $whereMap[($kk - 1)][1] = $whereMap[($kk - 1)][1] . ' ( ';
+                    }
+                    // 否则当前信息增加一个 "("
+                    else {
+                        $whereMap[$kk][1] = $whereMap[$kk][1] . ' ( ';
+                    }
+                }
+
+                // 最后一个OR出现
+                if (trim($vv[1]) == 'AND' && !$orStart) {
+                    $orStart          = true;
+                    $whereMap[$kk][0] = $whereMap[$kk][0] . ' ) ';
+                }
+                // 最后一条数据
+                elseif (!$orStart && count($whereMap) == ($kk + 1)) {
+                    $orStart          = true;
+                    $whereMap[$kk][0] = $whereMap[$kk][0] . ' ) ';
+                }
+
+            }
         }
 
-        $table = $this->parseTable($table, ['is_tablepre' => false]);
+        $mapSql = ' WHERE ';
+        foreach ($whereMap as $key => $item) {
 
-        $where ?: $where = $this->options['table']['name'] . '.id = ' . $table . '.id';
+            list($field, $link) = $item;
+            if (count($whereMap) - 1 == $key) {
 
-        $this->options['join'] = ['table' => $table, 'where' => $where, 'float' => $float];
+                $mapSql .= $field;
+            } else {
+                $mapSql .= $field . $link;
+            }
+        }
 
-        if (!isset($this->bulid['join'])) {
-            $this->bulid['join'] = ' ' . $float . ' JOIN ' . $table . ' ON ' . $where;
+        return $mapSql;
+    }
+
+    /** 解析Join */
+    public function parseJoin()
+    {
+        foreach ($this->options['join'] as $item) {
+
+            if ($this->bulid['table'] && empty($item['where'])) {
+                $item['where'] = $this->bulid['table'] . '.id = ' . $item['table'] . '.id';
+            }
+
+            if (!isset($this->bulid['join'])) {
+                $this->bulid['join'] = ' ' . $item['float'] . ' JOIN ' . $item['table'] . ' ON ' . $item['where'];
+            } else {
+                $this->bulid['join'] .= ' ' . $item['float'] . ' JOIN ' . $item['table'] . ' ON ' . $item['where'];
+            }
+        }
+
+        return $this->bulid['join'];
+
+    }
+
+    /** 解析limit */
+    public function parseLimit()
+    {
+
+        $this->bulid['limit'] = ' LIMIT ' . $this->options['limit']['offset'];
+        if ($this->options['limit']['pageSize']) {
+            $this->bulid['limit'] = ' LIMIT ' . $this->options['limit']['offset'] . ',' . $this->options['limit']['pageSize'];
+        }
+
+        return $this->bulid['limit'];
+    }
+
+    /** 解析field */
+    public function parseField()
+    {
+        if (!$this->options['field']) {
+            $this->bulid['field'] = '*';
         } else {
-            $this->bulid['join'] .= ' ' . $float . ' JOIN ' . $table . ' ON ' . $where;
+            $this->bulid['field'] = '';
+            foreach ($this->options['field'] as $val) {
+                $this->bulid['field'] .= $this->addFieldTag($val) . ',';
+            }
+
+            $this->bulid['field'] = substr($this->bulid['field'], 0, -1);
         }
 
-        return $this;
+        return $this->bulid['field'];
     }
 
-    /**
-     * 查询数量
-     * @date   2017-03-19T16:18:13+0800
-     * @author ChenMingjiang
-     * @param  [type]                   $limit [description]
-     * @return [type]                          [description]
-     */
-    public function limit(int $limit = 0, $pageSize = '')
+    /** 解析save */
+    public function parseSetData()
     {
-        $this->bulid['limit'] = ' LIMIT ' . $limit;
-        if ($pageSize) {
-            $this->bulid['limit'] = ' LIMIT ' . $limit . ',' . $pageSize;
-        }
+        $this->bulid['data'] = '';
 
-        $this->options['limit'] = ['limit' => $limit, 'pageSize' => $pageSize];
-
-        return $this;
-    }
-
-    /** 查询字段 */
-    public function field($field = '*')
-    {
-
-        if (!$field) {
-            return $this;
-        }
-
-        $this->options['field'] = is_array($field) ? $field : explode(',', $field);
-
-        $this->bulid['field'] = '';
-        foreach ($this->options['field'] as $val) {
-            $this->bulid['field'] .= $this->addFieldTag($val) . ',';
-        }
-
-        $this->bulid['field'] = substr($this->bulid['field'], 0, -1);
-
-        return $this;
-    }
-
-    /** 编辑字段 */
-    public function data($data, $exp = null, $value = null)
-    {
-        if ($exp !== null && $value === null) {
-            $data = [$data => $exp];
-        } elseif ($value !== null) {
-            $data = [$data => [$exp, $value]];
-        }
-
-        $data = is_array($data) ? $data : explode(',', $data);
-
-        $this->options['data'] = $data;
-        $this->bulid['data']   = '';
-
-        foreach ($data as $k => $v) {
+        foreach ($this->options['data'] as $k => $v) {
             $k = $this->addFieldTag($k);
             if (is_array($v)) {
 
@@ -586,19 +742,11 @@ class BuildSql
 
         $this->bulid['data'] = substr($this->bulid['data'], 0, -1);
 
-        return $this;
+        return $this->bulid['data'];
     }
 
-    /** 分组 */
-    public function group($value = '')
+    public function parseGroup()
     {
-
-        if (!$value) {
-            return $this;
-        }
-
-        $this->options['group'] = is_array($value) ? $value : explode(',', $value);
-
         foreach ($this->options['group'] as $val) {
             $this->bulid['group'] .= $this->addFieldTag($val) . ',';
         }
@@ -609,68 +757,39 @@ class BuildSql
             $this->bulid['group'] = ' , ' . substr($this->bulid['group'], 0, -1);
         }
 
-        return $this;
+        return $this->bulid['group'];
     }
 
-    /**
-     *
-     * 排序
-     * @date   2018-12-19T10:53:46+0800
-     * @author ChenMingjiang
-     * @param  [type]                   $value [description]
-     * @return [type]                   [description]
-     */
-    public function order($field)
+    public function parseOrder()
     {
-        if (!$field) {
-            return $this;
-        }
 
-        if (!is_array($field) && stripos($field, '(') === false) {
-            $parseOrder = explode(',', $field);
-        } else {
-            $parseOrder[] = $field;
-        }
-
-        foreach ($parseOrder as $key => $val) {
-
-            // 包含 () 的关键字
-            if (stripos($val, '(') !== false) {
-                $parseOrder[$key] = ' ' . $val;
-            } else {
-                list($field, $exp) = explode(' ', $val);
-                $parseOrder[$key]  = ' ' . $this->addFieldTag($field) . ' ' . $exp;
+        foreach ($this->options['order'] as $fields) {
+            // 分割字段 和排序类型
+            foreach ($fields as $key => $val) {
+                // 包含 () 的关键字
+                if (stripos($val, '(') !== false) {
+                    $orders[$key] = ' ' . $val;
+                } else {
+                    list($field, $exp) = explode(' ', $val);
+                    $orders[$key]      = ' ' . $this->addFieldTag($field) . ' ' . $exp;
+                }
             }
-
-        }
-
-        if ($parseOrder) {
-
-            $this->options['order'] = array_merge($parseOrder, $this->options['order']);
 
             if (!$this->bulid['order']) {
-                $this->bulid['order'] = ' ORDER BY ' . implode(',', $parseOrder);
+                $this->bulid['order'] = ' ORDER BY ' . implode(',', $orders);
             } else {
-                $this->bulid['order'] .= ' , ' . implode(',', $parseOrder);
+                $this->bulid['order'] .= ' , ' . implode(',', $orders);
             }
-
         }
 
-        return $this;
+        return $this->bulid['order'];
     }
 
-    /**
-     * hvaing
-     * @date   2017-11-22T01:18:55+0800
-     * @author ChenMingjiang
-     * @param  [type]                   $field [description]
-     * @return [type]                          [description]
-     */
-    public function having($field)
+    public function parseHaving()
     {
-        $this->options['having'] = $field;
-        $this->bulid['having']   = ' HAVING ' . $this->addFieldTag($field);
-        return $this;
+        $this->bulid['having'] = ' HAVING ' . $this->addFieldTag($field);
+
+        return $this->bulid['order'];
     }
 
     /**
@@ -709,32 +828,59 @@ class BuildSql
     /** 构建SQL语句 */
     public function bulidSql(string $type = 'SELECT')
     {
+
         $this->options['type'] = $type;
 
-        if (empty($this->bulid['table'])) {
-            throw new Exception('请选择数据表');
+        $this->connect(); // 链接数据库
+
+        $this->parseTable(); // 解析数据表
+
+        $this->parseField(); // 解析字段信息
+
+        switch ($type) {
+            case 'SELECT':
+                $this->bulid['sql'] = 'SELECT ' . $this->bulid['field'] . ' FROM ' . $this->bulid['table'];
+                break;
+            case 'UPDATE':
+                $this->bulid['sql'] = 'UPDATE ' . $this->bulid['table'] . ' SET ' . $this->parseSetData();
+                break;
+            case 'INSERT':
+                $this->bulid['sql'] = 'INSERT INTO ' . $this->bulid['table'] . ' SET ' . $this->parseSetData();
+                break;
+            case 'DELETE':
+                $this->bulid['sql'] = 'DELETE FROM ' . $this->bulid['table'];
+                break;
+            case 'COUNT':
+                $this->bulid['sql'] = 'SELECT  COUNT(' . $this->bulid['field'] . ') AS  t  FROM ' . $this->bulid['table'];
+                break;
+            default:
+                # code...
+                break;
         }
 
-        if ($type == 'SELECT') {
-            $this->bulid['sql'] = 'SELECT ' . $this->bulid['field'] . ' FROM ' . $this->bulid['table'];
-        } elseif ($type == 'UPDATE') {
-            $this->bulid['sql'] = 'UPDATE ' . $this->bulid['table'] . ' SET ' . $this->bulid['data'];
-        } elseif ($type == 'INSERT') {
-            $this->bulid['sql'] = 'INSERT INTO ' . $this->bulid['table'] . ' SET ' . $this->bulid['data'];
-        } elseif ($type == 'DELETE') {
-            $this->bulid['sql'] = 'DELETE FROM ' . $this->bulid['table'];
-        } elseif ($type == 'COUNT') {
-            $this->bulid['sql'] = 'SELECT  COUNT(' . $this->bulid['field'] . ') AS  t  FROM ' . $this->bulid['table'];
+        if ($this->options['join']) {
+            $this->bulid['sql'] .= $this->parseJoin();
         }
 
-        empty($this->bulid['join']) ?: $this->bulid['sql'] .= $this->bulid['join'];
+        if ($this->options['map']) {
+            $this->bulid['sql'] .= $this->parseWhere();
+        }
 
-        empty($this->options['map']) ?: $this->bulid['sql'] .= $this->parseWhere();
+        if ($this->options['group']) {
+            $this->bulid['sql'] .= $this->parseGroup();
+        }
 
-        empty($this->bulid['group']) ?: $this->bulid['sql'] .= $this->bulid['group'];
-        empty($this->bulid['having']) ?: $this->bulid['sql'] .= $this->bulid['having'];
-        empty($this->bulid['order']) ?: $this->bulid['sql'] .= $this->bulid['order'];
-        empty($this->bulid['limit']) ?: $this->bulid['sql'] .= $this->bulid['limit'];
+        if ($this->options['having']) {
+            $this->bulid['sql'] .= $this->parseHaving();
+        }
+
+        if ($this->options['order']) {
+            $this->bulid['sql'] .= $this->parseOrder();
+        }
+
+        if ($this->options['limit']) {
+            $this->bulid['sql'] .= $this->parseLimit();
+        }
 
     }
 
@@ -809,7 +955,7 @@ class BuildSql
             $data = $result->fetchColumn();
         }
 
-        return !empty($data) ? $data : '';
+        return $data ?: '';
 
     }
 
@@ -840,7 +986,7 @@ class BuildSql
             }
         }
 
-        return isset($data) ? $data : [];
+        return $data ?? [];
     }
 
     /**
@@ -933,11 +1079,11 @@ class BuildSql
     public function add($data = '', $exp = null, $value = null)
     {
 
-        $this->data($data, $exp, $value);
+        $this->setData($data, $exp, $value);
 
         $this->bulidSql('INSERT');
         $result = $this->query();
-        $id     = self::$link->lastInsertId();
+        $id     = $this->link->lastInsertId();
 
         return $id;
     }
@@ -960,7 +1106,7 @@ class BuildSql
     /** 修改保存 */
     public function save($data = '', $exp = null, $value = null)
     {
-        $this->data($data, $exp, $value);
+        $this->setData($data, $exp, $value);
 
         $this->bulidSql('UPDATE');
         $result = $this->query();
@@ -987,21 +1133,27 @@ class BuildSql
     // 开启事务
     public function startTrans()
     {
-        self::$link->beginTransaction();
+        // 链接数据库
+        $this->connect();
+        $this->link->beginTransaction();
         return true;
     }
 
     // 回滚事务
     public function rollback()
     {
-        self::$link->rollBack();
+        // 链接数据库
+        $this->connect();
+        $this->link->rollBack();
         return true;
     }
 
     // 提交事务
     public function commit()
     {
-        self::$link->commit();
+        // 链接数据库
+        $this->connect();
+        $this->link->commit();
         return true;
     }
 
@@ -1015,37 +1167,43 @@ class BuildSql
     public function query($sql = '')
     {
 
+        // 链接数据库
+        $this->connect();
+
         $this->bulid['sql'] = $sql ? $sql : $this->bulid['sql'];
 
         // 存入Sql Explain信息
         if (!empty($this->config['sql_explain'])) {
-            $res = self::$link->query('explain ' . $this->bulid['sql']);
+            $res = $this->link->query('explain ' . $this->bulid['sql']);
             if ($res) {
                 $this->sqlInfo['explain'] = $res->fetchAll(PDO::FETCH_ASSOC);
             }
         }
 
         $_beginTime = microtime(true);
-        $result     = self::$link->query($this->bulid['sql']);
+        $result     = $this->link->query($this->bulid['sql']);
         $_endTime   = microtime(true);
 
         $this->sqlInfo['time'] = $_endTime - $_beginTime; // 获取执行时间
-        $this->sqlInfo['sql']  = $this->bulid['sql'];
+        $this->sqlInfo['sql']  = $this->bulid['sql']; // 执行Sql
+
+        // 日志记录埋点
+        Log::debug('SQL:' . $this->bulid['sql'] . ' [' . $this->sqlInfo['time'] . 's]');
+        // 调试模式
+        if (Config::get('trace')) {
+            Trace::addSql($this->sqlInfo);
+        }
 
         // 执行成功
         if ($result) {
 
-            // 存入调试信息中和日志记录中
-            Trace::addSqlInfo($this->sqlInfo);
-
             return $result;
-
         } else {
 
-            list($errorCode, $errorNumber, $errorMsg) = self::$link->errorInfo();
+            list($errorCode, $errorNumber, $errorMsg) = $this->link->errorInfo();
             // 存入文件
-            if ($this->config['error_log'] ||　Config::get('debug')) {
-                Log::notice('SQL ERROR :' . $errorCode . ' ' . $errorMsg . ' SQL :  ' . $this->bulid['sql']);
+            if ($this->config['error_log'] || 　Config::get('debug')) {
+                Log::error('SQL ERROR :' . $errorCode . ' ' . $errorMsg . ' SQL :  ' . $this->bulid['sql']);
             }
 
             if (Config::get('debug')) {
