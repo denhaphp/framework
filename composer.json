@@ -23,7 +23,8 @@
     },
     "autoload": {
         "files": [  
-            "helper.php"
+            "helper.php",
+            "Denha.php"
         ],
         "psr-4": {
             "denha\\": "src"
