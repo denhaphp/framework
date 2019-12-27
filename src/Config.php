@@ -7,6 +7,8 @@ declare (strict_types = 1);
 
 namespace denha;
 
+use denha\Start;
+
 class Config
 {
     public static $includes = []; // 文件缓存
@@ -29,7 +31,7 @@ class Config
             $names = explode('.', $name);
             $num   = count($names); // name个数
 
-            $data = self::includes($path);
+            $data = Start::$config;
 
             // N维数组下最后一个数组值
             $fib = function ($thisNum = 0) use ($num, $names, &$data, &$fib) {
@@ -58,24 +60,41 @@ class Config
      * @author ChenMingjiang
      * @param  string                   $path    [数组则 合并多个配置文件]
      * @param  array                    $options [特殊参数]
+     *                                           root 根目录
      * @return [type]                   [description]
      */
     public static function includes($path = 'config.php', $options = [])
     {
 
-        $dirPath = isset($options['dirPath']) ? $options['dirPath'] : CONFIG_PATH;
+        $paths = is_array($path) ? $path : (array) $path;
 
-        $path = $dirPath . $path = $path ? $path : 'config.php';
+        $root = isset($options['root']) ? $options['root'] : CONFIG_PATH;
 
-        if (!isset(self::$includes[$path])) {
-            if (is_file($path)) {
-                self::$includes[$path] = include $path;
-            } else {
-                self::$includes[$path] = [];
+        $md5 = md5(json_encode($paths));
+
+        if (!isset(self::$includes[$md5])) {
+
+            self::$includes[$md5] = [];
+
+            foreach ($paths as $item) {
+                $onePath = $root . ($item ?: 'config.php');
+
+                $oneMd5 = md5($item);
+
+                if (!isset(self::$includes[$oneMd5])) {
+                    if (is_file($onePath)) {
+                        self::$includes[$oneMd5] = include $onePath;
+                    } else {
+                        self::$includes[$oneMd5] = [];
+                    }
+                }
+
+                self::$includes[$md5] = array_merge(self::$includes[$md5], self::$includes[$oneMd5]);
+
             }
         }
 
-        return self::$includes[$path];
+        return self::$includes[$md5];
 
     }
 
