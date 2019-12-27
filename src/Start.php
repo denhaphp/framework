@@ -7,6 +7,7 @@ use denha\Config;
 use denha\Exception;
 use denha\HttpResource;
 use denha\Log;
+use denha\Route;
 use \ReflectionClass;
 use \ReflectionMethod;
 
@@ -32,24 +33,23 @@ class Start
 
         Exception::run(HttpResource::initInstance(), self::$config); // 加载错误面板
 
-        // 日志记录
-        Log::info('-----------------------------------------------');
-        Log::info('URL:' . HttpResource::getUrl() . ' Method:' . HttpResource::getMethod());
+        Route::main(); //解析路由
 
-        self::makeRouteRun(); // 运行路由
+        // 日志记录
+        Log::setChannel('Denha', ['formatter' => ['output' => '%message%','date_format'=>'Y-m-d']])->debug('-------------------------------------------------------------------------');
+        Log::debug('Method:' . HttpResource::getMethod() . ' URL:' . HttpResource::getUrl() . ' Crontroller:' . MODULE . DS . CONTROLLER . DS . ACTION);
+
+        self::makeRouteRun(); // 运行控制器f
 
     }
 
     public static function makeRouteRun()
     {
-        $class = Route::main(); //解析路由
 
         // 日志记录
-        Log::info('Crontroller:' . MODULE . DS . CONTROLLER . DS . ACTION);
-
         $action = lcfirst(parsename(ACTION, 1)); // 方法名称
 
-        $object = new ReflectionClass($class); // 获取类信息
+        $object = new ReflectionClass(Route::$class); // 获取类信息
         // 进入post提交方法
         if ((HttpResource::$request['method'] == 'POST') && $object->hasMethod($action . 'Post')) {
             $methodAction = $action . 'Post';
@@ -57,7 +57,7 @@ class Start
             $methodAction = $action;
         }
 
-        $method = new ReflectionMethod($class, $methodAction); // 直接获取方法信息
+        $method = new ReflectionMethod(Route::$class, $methodAction); // 直接获取方法信息
 
         // 只有公共方法可以调用
         if (!$method->isPublic()) {
@@ -73,7 +73,7 @@ class Start
             }
         }
 
-        $method->invokeArgs(new $class(), $params);
+        $method->invokeArgs(new Route::$class(), $params);
 
         self::$methodDocComment = $method->getDocComment(); // 保存方法注解信息
 
