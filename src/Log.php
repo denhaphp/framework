@@ -17,49 +17,102 @@ use Monolog\Logger;
 
 class Log
 {
-    private static $instance;
+    private static $instance = [];
     private static $loggers;
     private static $config;
-    private static $name;
     private static $level;
-    private $handler;
     private static $ext = '.log';
 
-    public static function setChannel($name)
+    private $id;
+    private $links;
+    private $handler;
+
+    public function __construct($name, $id)
     {
-        self::$name = $name;
+        $this->name  = $name;
+        $this->id    = $id;
+        $this->links = self::getConfig($id);
+    }
 
-        if (is_null(self::$instance)) {
-            self::$instance = new Log;
+    public static function setChannel($name, $config = [])
+    {
+
+        $id = self::getId($name, $config);
+
+        if (is_null(self::$instance[$id])) {
+
+            self::setConfig($name, $config);
+
+            self::$instance[$id] = new Log($name, $id);
+            self::$loggers[$id]  = new Logger($name);
+
         }
 
-        if (!isset(self::$config[$name])) {
-            self::$config[$name] = Config::get('log.channels.' . $name);
+        return self::$instance[$id];
+    }
+
+    public static function getId($name, $config = [])
+    {
+        if ($config) {
+            $name .= '_' . md5(json_encode($config));
         }
+
+        return $name;
+
+    }
+
+    public static function setConfig(string $name, array $config)
+    {
+        
+        if (!self::$config) {
+            self::$config = Config::includes('log.php');
+        }
+
+        if (!$config) {
+            return false;
+        }
+
+        if (isset(self::$config[$name])) {
+            self::$config[$name . '_' . md5(json_encode($config))] = array_merge(self::$config[$name], $config);
+        } else {
+            self::$config[$name] = $config;
+        }
+
+    }
+
+    public function getConfig($name)
+    {
 
         if (!self::$config[$name]) {
-            throw new Exception("Log channel not find", 1);
-
+            throw new Exception("Log channel not find config from name :" . $name . json_encode(self::$config), 1);
         }
 
-        if (!isset(self::$loggers[$name])) {
-            self::$loggers[$name] = new Logger($name);
-        }
+        return self::$config[$name];
 
-        return self::$instance;
     }
 
     /** [formatter 日志格式设置] */
-    public function setformatter($data = "[%datetime%] %channel%.%level_name% %message% %context% %extra%", $type = 'line')
+    public function push($output = null, $dateFormat = '', $type = null)
     {
 
-        if (self::$config[self::$name]['type'] == 'File') {
+        $type       = $type ?: ($this->links['formatter']['type'] ?? 'line');
+        $output     = $output ?: ($this->links['formatter']['output'] ?? '');
+        $dateFormat = $dateFormat ?: ($this->links['formatter']['date_format'] ?? '');
+
+        if ($this->links['type'] == 'File') {
             $this->streamHandler();
         }
 
         if ($type == 'line') {
-            $this->handler->setFormatter(new LineFormatter($data . "\n", "Y-m-d H:i:s", true, true));
+            $this->handler->setFormatter(new LineFormatter($output . "\n", $dateFormat, true, true));
         }
+
+        // 保存进内存中
+        if (!$this->links['realtime'] && HttpResource::getMethod() != 'CLI') {
+            $this->handler = new BufferHandler($this->handler);
+        }
+
+        self::$loggers[$this->id]->pushHandler($this->handler);
 
         return $this;
     }
@@ -68,37 +121,45 @@ class Log
     public function streamHandler()
     {
         // 每日递增模式
-        if (self::$config[self::$name]['drive']['name'] == 'days') {
-            $fileName      = self::$config[self::$name]['drive']['path'];
-            $maxFiles      = self::$config[self::$name]['drive']['file_max'] ?? 0;
+        if ($this->links['drive']['name'] == 'daily') {
+            $fileName      = $this->links['drive']['path'];
+            $maxFiles      = $this->links['drive']['file_max'] ?? 0;
             $this->handler = new RotatingFileHandler($fileName . self::$ext, $maxFiles);
             $this->handler->setFilenameFormat('{date}', 'Y-m-d');
         }
         // 单文件模式
-        elseif (self::$config[self::$name]['drive']['name'] == 'single') {
-            $fileName      = self::$config[self::$name]['drive']['path'] . (self::$config[self::$name]['single']['drive']['file_name'] ?: self::$name);
+        elseif ($this->links['drive']['name'] == 'single') {
+            $fileName      = $this->links['drive']['path'] . ($this->links['single']['drive']['file_name'] ?: $this->name);
             $this->handler = new StreamHandler($fileName . self::$ext);
         }
 
         return $this;
+
     }
 
-    /** 推送 */
-    public function push()
+    /** 过滤日志记录类型 */
+    public function limitLevel($levelName)
     {
-        // 保存进内存中
-        if (!self::$config[self::$name]['realtime'] && HttpResource::getMethod() != 'CLI') {
-            $this->handler = new BufferHandler($this->handler);
+        if (!in_array($levelName, $this->links['level'])) {
+            return false;
         }
 
-        self::$loggers[self::$name]->pushHandler($this->handler);
-
-        return $this;
+        return true;
     }
 
     public function __call($name, $arguments)
     {
-        self::__callStatic($name, $arguments);
+
+        $message   = $arguments[0] ?: '';
+        $context   = $arguments[1] ?: [];
+        $levelName = $arguments[2] ?: '';
+
+        if ($this->limitLevel($name)) {
+            if (!self::$loggers[$this->id]->getHandlers()) {
+                $this->push();
+            }
+            self::$loggers[$this->id]->$name($message, $context);
+        }
     }
 
     public static function __callStatic($name, $arguments)
@@ -109,58 +170,16 @@ class Log
         $levelName = $arguments[2] ?: '';
 
         // 获取默认配置
-        if (!self::$name) {
-            self::setChannel('Denha')->setformatter()->push();
+        $denha = self::setChannel('Denha');
+        if (!self::$loggers[$denha->id]->getHandlers()) {
+            $denha->push();
         }
 
         // 过滤日志记录类型
-        if (self::limitLevel($name)) {
-            self::$loggers[self::$name]->$name($message, $context);
+        if ($denha->limitLevel($name)) {
+            self::$loggers[$denha->id]->$name($message, $context);
         }
 
     }
 
-    /** 过滤日志记录类型 */
-    public static function limitLevel($levelName)
-    {
-        if (!in_array($levelName, self::$config[self::$name]['level'])) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * 创建日志
-     * @param $name
-     * @return mixed
-     */
-    private static function createLogger($name)
-    {
-        if (empty(self::$loggers[$name])) {
-            // 根据业务域名与方法名进行日志名称的确定
-            $category = $_SERVER['SERVER_NAME'];
-            // 日志文件目录
-            $fileName = self::$fileName;
-            // 日志保存时间
-            $maxFiles = self::$maxFiles;
-            // 日志等级
-            $level = self::$level;
-            // 权限
-            $filePermission = self::$filePermission;
-
-            // 创建日志
-            $logger = new Logger($category);
-            // 日志文件相关操作
-            $handler = new RotatingFileHandler("{$fileName}{$name}.log", $maxFiles, $level, true, $filePermission);
-            // 日志格式
-            $formatter = new LineFormatter("%datetime% %channel%:%level_name% %message% %context% %extra%\n", "Y-m-d H:i:s", false, true);
-
-            $handler->setFormatter($formatter);
-            $logger->pushHandler($handler);
-
-            self::$loggers[$name] = $logger;
-        }
-        return self::$loggers[$name];
-    }
 }
