@@ -36,7 +36,7 @@ class Start
         Route::main(); //解析路由
 
         // 日志记录
-        Log::setChannel('Denha', ['formatter' => ['output' => '%message%','date_format'=>'Y-m-d']])->debug('-------------------------------------------------------------------------');
+        Log::setChannel('Denha', ['formatter' => ['output' => '%message%']])->debug('-------------------------------------------------------------------------');
         Log::debug('Method:' . HttpResource::getMethod() . ' URL:' . HttpResource::getUrl() . ' Crontroller:' . MODULE . DS . CONTROLLER . DS . ACTION);
 
         self::makeRouteRun(); // 运行控制器f
