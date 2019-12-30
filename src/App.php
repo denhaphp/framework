@@ -25,14 +25,34 @@ class App
      * @param  string                   $route  [路由模式 mca smca ca]
      * @return [type]                           [description]
      */
-    public  function start()
+    public function start($configPath = '')
     {
 
+        Exception::run(HttpResource::initInstance()); // 加载错误面板
+
+        $appPath = $this->getFramePath();
+        // 加载配置文件
+        if (is_file($appPath . 'env.php')) {
+            include_once $appPath . 'env.php';
+        }
+
         // 获取配置文档信息
-        self::$config = Config::includes();
+        if ($configPath) {
+            self::$config = Config::includes(['config.php', $configPath]);
+        } else {
+            self::$config = Config::includes();
+        }
 
+        Exception::setConfig(self::$config); // 配置debug
 
-        Exception::setConfig(self::$config); // 加载错误面板
+        // 载入助手函数
+        foreach (self::$config['help_paths'] as $item) {
+            if (!is_file($item)) {
+                throw new Exception('path: ' . $item . ' is not file from config->help_paths');
+            }
+
+            include_once $item;
+        }
 
         Route::main(); //解析路由
 
@@ -44,7 +64,12 @@ class App
 
     }
 
-    protected  function makeRouteRun()
+    protected function getFramePath()
+    {
+        return dirname(__DIR__) . DIRECTORY_SEPARATOR;
+    }
+
+    protected function makeRouteRun()
     {
 
         // 日志记录
@@ -79,44 +104,4 @@ class App
         self::$methodDocComment = $method->getDocComment(); // 保存方法注解信息
 
     }
-
-    /**
-     * 加载应用文件和配置
-     * @access protected
-     * @return void
-     */
-    protected function load(): void
-    {
-        $appPath = $this->getAppPath();
-
-        if (is_file($appPath . 'common.php')) {
-            include_once $appPath . 'common.php';
-        }
-
-        include_once $this->thinkPath . 'helper.php';
-
-        $configPath = $this->getConfigPath();
-
-        $files = [];
-
-        if (is_dir($configPath)) {
-            $files = glob($configPath . '*' . $this->configExt);
-        }
-
-        foreach ($files as $file) {
-            $this->config->load($file, pathinfo($file, PATHINFO_FILENAME));
-        }
-
-        if (is_file($appPath . 'event.php')) {
-            $this->loadEvent(include $appPath . 'event.php');
-        }
-
-        if (is_file($appPath . 'service.php')) {
-            $services = include $appPath . 'service.php';
-            foreach ($services as $service) {
-                $this->register($service);
-            }
-        }
-    }
-
 }
