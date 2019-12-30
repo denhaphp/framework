@@ -7,7 +7,7 @@ declare (strict_types = 1);
 
 namespace denha;
 
-use denha\Start;
+use denha\App;
 
 class Config
 {
@@ -31,7 +31,7 @@ class Config
             $names = explode('.', $name);
             $num   = count($names); // name个数
 
-            $data = Start::$config;
+            $data = App::$config;
 
             // N维数组下最后一个数组值
             $fib = function ($thisNum = 0) use ($num, $names, &$data, &$fib) {

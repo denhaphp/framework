@@ -10,6 +10,7 @@ namespace denha;
 use denha\HttpResource;
 use denha\Template;
 use denha\Trace;
+use denha\Config;
 
 class Controller
 {
@@ -102,7 +103,7 @@ class Controller
         ];
 
         // 控制开关
-        if (Start::$config['app_debug']) {
+        if (Config::get('app_debug')) {
             $debug = [
                 'debug' => [
                     'param'      => [

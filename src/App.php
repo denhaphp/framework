@@ -11,7 +11,7 @@ use denha\Route;
 use \ReflectionClass;
 use \ReflectionMethod;
 
-class Start
+class App
 {
     public static $config           = [];
     public static $httpResource     = [];
@@ -25,13 +25,14 @@ class Start
      * @param  string                   $route  [路由模式 mca smca ca]
      * @return [type]                           [description]
      */
-    public static function up()
+    public  function start()
     {
 
         // 获取配置文档信息
         self::$config = Config::includes();
 
-        Exception::run(HttpResource::initInstance(), self::$config); // 加载错误面板
+
+        Exception::setConfig(self::$config); // 加载错误面板
 
         Route::main(); //解析路由
 
@@ -39,11 +40,11 @@ class Start
         Log::setChannel('Denha', ['formatter' => ['output' => '%message%']])->debug('-------------------------------------------------------------------------');
         Log::debug('Method:' . HttpResource::getMethod() . ' URL:' . HttpResource::getUrl() . ' Crontroller:' . MODULE . DS . CONTROLLER . DS . ACTION);
 
-        self::makeRouteRun(); // 运行控制器f
+        $this->makeRouteRun(); // 运行控制器
 
     }
 
-    public static function makeRouteRun()
+    protected  function makeRouteRun()
     {
 
         // 日志记录
@@ -77,6 +78,45 @@ class Start
 
         self::$methodDocComment = $method->getDocComment(); // 保存方法注解信息
 
+    }
+
+    /**
+     * 加载应用文件和配置
+     * @access protected
+     * @return void
+     */
+    protected function load(): void
+    {
+        $appPath = $this->getAppPath();
+
+        if (is_file($appPath . 'common.php')) {
+            include_once $appPath . 'common.php';
+        }
+
+        include_once $this->thinkPath . 'helper.php';
+
+        $configPath = $this->getConfigPath();
+
+        $files = [];
+
+        if (is_dir($configPath)) {
+            $files = glob($configPath . '*' . $this->configExt);
+        }
+
+        foreach ($files as $file) {
+            $this->config->load($file, pathinfo($file, PATHINFO_FILENAME));
+        }
+
+        if (is_file($appPath . 'event.php')) {
+            $this->loadEvent(include $appPath . 'event.php');
+        }
+
+        if (is_file($appPath . 'service.php')) {
+            $services = include $appPath . 'service.php';
+            foreach ($services as $service) {
+                $this->register($service);
+            }
+        }
     }
 
 }

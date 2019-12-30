@@ -22,6 +22,15 @@ class Exception extends \Exception
      */
     protected $data = [];
 
+    private static $config = [
+        'debug'=>true
+    ];
+
+
+    public static function setConfig($config){
+        self::$config = array_merge(self::$config,$config);
+    }
+
     /**
      * [run description]
      * @date   2019-12-23T09:45:04+0800
@@ -30,13 +39,13 @@ class Exception extends \Exception
      * @param  array                    $options      [description]
      * @return [type]                   [description]
      */
-    public static function run(HttpResource $httpResource, $config)
+    public static function run(HttpResource $httpResource)
     {
 
         $whoops = new ErrorRun;
 
         // 隐藏错误信息
-        if ($config['debug'] == false) {
+        if (self::$config['debug'] == false) {
 
             header("http/1.1 404 not found");
             header("status: 404 not found");
@@ -46,11 +55,12 @@ class Exception extends \Exception
             } elseif ($httpResource->isAjax()) {
                 $whoops->prependHandler(function () {echo '{"errord":"denha have a error so kill"}';});
             } else {
+                $config =  self::$config;
                 $whoops->prependHandler(function () use ($config) {return include $config['error']['tpl'];});
             }
 
             // 保存错误日志
-            if ($config['error']['save_log']) {
+            if (self::$config['error']['save_log']) {
                 $whoops->pushHandler(function ($exception, $inspector, $run) {
                     Log::warning($exception);
                 });
