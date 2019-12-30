@@ -22,10 +22,7 @@
     "require-dev": {
     },
     "autoload": {
-        "files": [  
-            "helper.php",
-            "env.php"
-        ],
+        "files": [],
         "psr-4": {
             "denha\\": "src"
         }
