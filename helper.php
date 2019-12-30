@@ -6,35 +6,6 @@ use denha\Controller;
 use denha\HttpResource;
 use denha\Route;
 
-if (!function_exists('GSF')) {
-    function GSF($array, $v)
-    {
-        foreach ($array as $key => $value) {
-            if (!is_array($key)) {
-                GSC($key, $v);
-            } else {
-                GSF($key, $v);
-            }
-
-            if (!is_array($value)) {
-                GSC($value, $v);
-            } else {
-                GSF($value, $v);
-            }
-        }
-    }
-}
-
-if (!function_exists('GSC')) {
-    function GSC($str, $v)
-    {
-        foreach ($v as $key => $value) {
-            if ((preg_match('/' . $value . '/is', $str) == 1) || (preg_match('/' . $value . '/is', urlencode($str)) == 1)) {
-                abort('您的请求带有不合法参数!', 404);
-            }
-        }
-    }
-}
 
 if (!function_exists('abort')) {
     /**

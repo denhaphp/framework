@@ -341,11 +341,38 @@ class HttpResource
         $httpReferer = empty($_SERVER['HTTP_REFERER']) ? [] : [$_SERVER['HTTP_REFERER']];
         $queryString = empty($_SERVER['QUERY_STRING']) ? [] : [$_SERVER['QUERY_STRING']];
 
-        GSF($queryString, $urlArr);
-        GSF($httpReferer, $argsArr);
-        GSF($_GET, $argsArr);
-        GSF($_POST, $argsArr);
-        GSF($_COOKIE, $argsArr);
+        self::GSF($queryString, $urlArr);
+        self::GSF($httpReferer, $argsArr);
+        self::GSF($_GET, $argsArr);
+        self::GSF($_POST, $argsArr);
+        self::GSF($_COOKIE, $argsArr);
 
+    }
+
+
+    public static function GSF($array, $v)
+    {
+        foreach ($array as $key => $value) {
+            if (!is_array($key)) {
+                self::GSC($key, $v);
+            } else {
+                self::GSF($key, $v);
+            }
+
+            if (!is_array($value)) {
+                self::GSC($value, $v);
+            } else {
+                self::GSF($value, $v);
+            }
+        }
+    }
+
+    public static function GSC($str, $v)
+    {
+        foreach ($v as $key => $value) {
+            if ((preg_match('/' . $value . '/is', $str) == 1) || (preg_match('/' . $value . '/is', urlencode($str)) == 1)) {
+                throw new Exception('you http params wrongful !!!');
+            }
+        }
     }
 }
