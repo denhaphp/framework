@@ -21,5 +21,3 @@ define('EXT', '.php'); //文件后缀
 
 define('TIME', $_SERVER['REQUEST_TIME']); //系统时间
 define('START_USE_MENUS', memory_get_usage()); // 内存使用初始情况
-
-require_once VENDOR_PATH . 'autoload.php';
