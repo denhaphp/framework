@@ -43,7 +43,9 @@ class App
             self::$config = Config::includes();
         }
 
-        Exception::setConfig(self::$config); // 配置debug
+        if (!self::$config['debug']) {
+            Exception::hide(HttpResource::initInstance(), self::$config); // 隐藏错误提示
+        }
 
         // 载入助手函数
         foreach (self::$config['help_paths'] as $item) {

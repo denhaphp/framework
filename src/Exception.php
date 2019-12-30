@@ -22,13 +22,34 @@ class Exception extends \Exception
      */
     protected $data = [];
 
-    private static $config = [
-        'debug'=>true
-    ];
+    private static $whoops;
 
+    public static function hide(HttpResource $httpResource, $config)
+    {
 
-    public static function setConfig($config){
-        self::$config = array_merge(self::$config,$config);
+        self::$whoops = new ErrorRun;
+
+        header("http/1.1 404 not found");
+        header("status: 404 not found");
+
+        if ($httpResource->getMethod() == 'CLI') {
+            self::$whoops->prependHandler(function () {echo 'denha have a error so kill';});
+        } elseif ($httpResource->isAjax()) {
+            self::$whoops->prependHandler(function () {echo '{"errord":"denha have a error so kill"}';});
+        } else {
+            if (is_file($config['error']['tpl'])) {
+                self::$whoops->prependHandler(function () use ($config) {return include $config['error']['tpl'];});
+            }
+        }
+
+        // 保存错误日志
+        if ($config['error']['save_log']) {
+            self::$whoops->pushHandler(function ($exception, $inspector, $run) {
+                Log::warning($exception);
+            });
+        }
+
+        self::$whoops->register();
     }
 
     /**
@@ -41,80 +62,30 @@ class Exception extends \Exception
      */
     public static function run(HttpResource $httpResource)
     {
+        // if (self::$whoops) {
+        //     unset(self::$whoops);
+        // }
 
-        $whoops = new ErrorRun;
+        self::$whoops = new ErrorRun;
 
-        // 隐藏错误信息
-        if (self::$config['debug'] == false) {
-
-            header("http/1.1 404 not found");
-            header("status: 404 not found");
-
-            if ($httpResource->getMethod() == 'CLI') {
-                $whoops->prependHandler(function () {echo 'denha have a error so kill';});
-            } elseif ($httpResource->isAjax()) {
-                $whoops->prependHandler(function () {echo '{"errord":"denha have a error so kill"}';});
-            } else {
-                $config =  self::$config;
-                $whoops->prependHandler(function () use ($config) {return include $config['error']['tpl'];});
-            }
-
-            // 保存错误日志
-            if (self::$config['error']['save_log']) {
-                $whoops->pushHandler(function ($exception, $inspector, $run) {
-                    Log::warning($exception);
-                });
-            }
-        }
         // cli模式
-        elseif ($httpResource->getMethod() == 'CLI') {
-            $whoops->prependHandler(new PlainTextHandler);
+        if ($httpResource->getMethod() == 'CLI') {
+            self::$whoops->prependHandler(new PlainTextHandler);
         }
         //  ajax模式
         elseif ($httpResource->isAjax()) {
-            $whoops->prependHandler(new JsonResponseHandler);
+            self::$whoops->prependHandler(new JsonResponseHandler);
         }
         // web页面模式
         else {
             $handler = new PrettyPageHandler;
             $handler->setPageTitle("denha have errors");
             // $handler->setEditor(function ($file, $line) {error_log($file . $line, 3, DATA_RUN_PATH . '1.log');});
-            $whoops->prependHandler($handler);
+            self::$whoops->prependHandler($handler);
         }
 
-        $whoops->register();
+        self::$whoops->register();
 
-    }
-
-    /**
-     * 设置异常额外的Debug数据
-     * 数据将会显示为下面的格式
-     *
-     * Exception Data
-     * --------------------------------------------------
-     * Label 1
-     *   key1      value1
-     *   key2      value2
-     * Label 2
-     *   key1      value1
-     *   key2      value2
-     *
-     * @param string $label 数据分类，用于异常页面显示
-     * @param array  $data  需要显示的数据，必须为关联数组
-     */
-    final protected function setData($label, array $data)
-    {
-        $this->data[$label] = $data;
-    }
-
-    /**
-     * 获取异常额外Debug数据
-     * 主要用于输出到异常页面便于调试
-     * @return array 由setData设置的Debug数据
-     */
-    final public function getData()
-    {
-        return $this->data;
     }
 
 }
