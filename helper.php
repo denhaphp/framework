@@ -3,9 +3,9 @@
 use denha\Cache;
 use denha\Config;
 use denha\Controller;
+use denha\db\Database;
 use denha\HttpResource;
 use denha\Route;
-use denha\db\Database;
 
 if (!function_exists('abort')) {
     /**
@@ -83,31 +83,7 @@ if (!function_exists('auth')) {
     }
 }
 
-if (!function_exists('cache')) {
-    /**
-     * 缓存
-     * @date   2018-09-15T11:27:15+0800
-     * @author ChenMingjiang
-     * @param  string                   $name    [缓存Key]
-     * @param  string                   $value   [缓存信息]
-     * @param  integer                  $expire  [过期时间 0则永不过期]
-     * @param  integer                  $options [参数配置]
-     * @return [type]                            [description]
-     */
-    function cache($name, $value = '', $expire = 0, $options = [])
-    {
-        $cache = Cache::connect($options);
-        if ($value === null) {
-            $result = $cache->del($name);
-        } elseif ($value === '') {
-            $result = $cache->read($name);
-        } else {
-            $result = $cache->save($name, $value, $expire);
-        }
 
-        return $result;
-    }
-}
 
 if (!function_exists('config')) {
     /**

@@ -7,26 +7,49 @@ declare (strict_types = 1);
 
 namespace denha;
 
+use denha\cache\CacheFactory;
 use denha\Config;
 
 class Cache
 {
-    public static $instance = [];
-    public $id;
 
-    public static function connect($options = [])
+    public static function channel(string $key)
     {
-        $config = !empty($options) ? $options : Config::get('cache');
-        $type   = !empty($config['type']) ? $config['type'] : 'File';
-        $id     = md5(json_encode($config));
-
-        if (!isset(self::$instance[$id])) {
-            $class = 'denha\cache\\' . $type;
-
-            self::$instance[$id] = $class::init($config);
+        $config = Config::get('cache')[$key];
+        if (!Config::get('cache')[$key]) {
+            throw new Exception("Cache Config Name Not Find : cache." . $key);
         }
 
-        return self::$instance[$id];
+        return CacheFactory::message($config);
+    }
+
+    public static function create($config = [])
+    {
+        $config = $config ?: array_shift(Config::get('cache'));
+
+        return CacheFactory::message($config);
+    }
+
+    public static function __callStatic($name, $options = [])
+    {
+
+        $names = ['set', 'get', 'delete', 'has', 'getMultiple', 'setMultiple', 'deleteMultiple', 'clear'];
+
+        if (in_array($name, $names)) {
+            return Cache::create()->$name(...$options);
+        }
+
+        if ($options) {
+            if (!Config::get('cache')[$name]) {
+                throw new Exception("Cache Config Name Not Find : cache." . $name);
+            }
+
+            $config = array_merge(Config::get('cache')[$name], $options);
+            return Cache::create($config);
+        } else {
+            return Cache::channel($name);
+        }
+
     }
 
 }
