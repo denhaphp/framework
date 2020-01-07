@@ -11,7 +11,7 @@ use denha\Trace;
 use \Exception;
 use \PDO;
 
-class BuildSql
+class Database
 {
     private static $configs;
     private static $instance; // 单例实例化;
@@ -41,7 +41,7 @@ class BuildSql
     public static function getInstance(array $config = [])
     {
         if (is_null(self::$instance)) {
-            self::$instance = new BuildSql($config);
+            self::$instance = new Database($config);
         }
 
         return self::$instance;
