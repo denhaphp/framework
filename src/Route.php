@@ -24,24 +24,22 @@ class Route
     public static $id         = 0;
     public static $regularUrl = []; // 路由规则数组
 
-
     // 执行主体
     public static function main()
     {
         self::$config          = Config::get('route');
         self::$thisRule['uri'] = self::$uri = self::parseUri();
-        
+
         // 检查规则路由
         if (self::$config['open_route']) {
             // 加载路由规则文件
-            $routeFiles = (array)self::$config['route_files'];
+            $routeFiles = (array) self::$config['route_files'];
             foreach ($routeFiles as $file) {
                 include_once $file;
             }
 
             // 获取当前url
             self::$uri = self::getRouteUrl('/' . self::$uri);
-
         }
 
         // 转换Url参数为GET参数
@@ -58,7 +56,10 @@ class Route
         }
 
         define('MODULE', implode('.', array_slice($routeArr, 0, -2)));
-        define('CONTROLLER', parsename(implode(array_slice($routeArr, -2, 1)), true));
+        define('CONTROLLER', ucfirst(preg_replace_callback('/_([a-zA-Z])/', function ($match) {
+            return strtoupper($match[1]);
+        }, implode(array_slice($routeArr, -2, 1)))));
+
         define('ACTION', end($routeArr));
 
         $class = ['app', str_replace('.', '\\', MODULE), CONTROLLER];
@@ -84,14 +85,14 @@ class Route
     public static function rule(string $url, $changeUrl = null, array $options = [])
     {
 
-        if(!$changeUrl){
+        if (!$changeUrl) {
             return false;
         }
 
         $params      = isset($options['params']) ? $options['params'] : '';
         $suffix      = isset($options['suffix']) ? $options['suffix'] : '/';
         $limitSuffix = isset($options['limit_suffix']) ? explode(',', $options['limit_suffix']) : '';
-        $oldUriHide   = isset($options['old_uri_hide']) ? $options['old_uri_hide'] : Config::get('route')['old_uri_hide'];
+        $oldUriHide  = isset($options['old_uri_hide']) ? $options['old_uri_hide'] : Config::get('route')['old_uri_hide'];
         $jump        = isset($options['jump']) ? $options['jump'] : false;
 
         self::$rule[self::$id] = [
@@ -105,21 +106,21 @@ class Route
         ];
 
         // 加入黑名单列表
-        if($oldUriHide){
-            self::$regularUrl['blacklist'][md5($url.$params)] = self::$id;
+        if ($oldUriHide) {
+            self::$regularUrl['blacklist'][md5($url . $params)] = self::$id;
         }
 
         // 闭包访问组 闭包访问组不存在改写情况则单独分出来
-        if(is_object($changeUrl) || $changeUrl instanceof \Closure){
-            self::$regularUrl['closure'][md5($url.$params)] = self::$id;
+        if (is_object($changeUrl) || $changeUrl instanceof \Closure) {
+            self::$regularUrl['closure'][md5($url . $params)] = self::$id;
         }
         // 改写信息
-        else{
+        else {
             self::$regularUrl['changeUrl'][md5($changeUrl . $params)] = self::$id;
         }
 
         // 原生信息
-        self::$regularUrl['url'][md5($url . $params)]             = self::$id;
+        self::$regularUrl['url'][md5($url . $params)] = self::$id;
 
         self::$id++;
 
@@ -149,7 +150,7 @@ class Route
         return [$changeUrl, $params];
     }
 
-    /** 
+    /**
      * 根据改写路径获取实际路径
      * @date   2019-12-19T13:53:53+0800
      * @author ChenMingjiang
@@ -166,37 +167,37 @@ class Route
         if ($suffix) {
             // 删除后缀
             $changeUrl = str_replace('.' . $suffix, '', $changeUrl);
-        }  
+        }
 
-        $cpmd5 = md5($changeUrl.$params); // 参数+地址匹配
+        $cpmd5 = md5($changeUrl . $params); // 参数+地址匹配
         $cmd5  = md5($changeUrl); // 纯地址匹配
 
         // 判断是否存在原生地址黑名单黑名单
-        if(isset(self::$regularUrl['blacklist'][$cpmd5]) || isset(self::$regularUrl['blacklist'][$cmd5]) ){
-            if(Config::get('debug')){
+        if (isset(self::$regularUrl['blacklist'][$cpmd5]) || isset(self::$regularUrl['blacklist'][$cmd5])) {
+            if (Config::get('debug')) {
                 throw new Exception('当前路由已被禁止访问');
-            }else{
+            } else {
                 throw new Exception('禁止访问');
             }
         }
 
         // 如果存在闭包信息则直接返回
-        if(isset(self::$regularUrl['closure'][$cpmd5]) || isset(self::$regularUrl['closure'][$cmd5]) ){
+        if (isset(self::$regularUrl['closure'][$cpmd5]) || isset(self::$regularUrl['closure'][$cmd5])) {
             $funs = self::$rule[self::$regularUrl['closure'][$cpmd5]]['change_url'] ?? self::$rule[self::$regularUrl['closure'][$cmd5]]['change_url'];
 
-            if(is_callable($funs)){
+            if (is_callable($funs)) {
                 die(call_user_func($funs));
             }
         }
 
         // 匹配changeUrl
-         if(isset(self::$regularUrl['changeUrl'][$cpmd5]) || isset(self::$regularUrl['closure'][$cmd5]) ){
-            self::$thisRule['rule'] = self::$rule[self::$regularUrl['changeUrl'][$cpmd5]] ??  self::$rule[self::$regularUrl['changeUrl'][$cmd5]];
+        if (isset(self::$regularUrl['changeUrl'][$cpmd5]) || isset(self::$regularUrl['closure'][$cmd5])) {
+            self::$thisRule['rule'] = self::$rule[self::$regularUrl['changeUrl'][$cpmd5]] ?? self::$rule[self::$regularUrl['changeUrl'][$cmd5]];
             self::changeGetValue(self::$thisRule['rule']['params']); // 保存GET参数
 
-            $url  = self::$thisRule['rule']['url'] . ($params ? '/s/' . $params : '');
+            $url = self::$thisRule['rule']['url'] . ($params ? '/s/' . $params : '');
 
-         }
+        }
 
         return $url ?? $uri;
     }
@@ -214,16 +215,16 @@ class Route
 
         list($changeUrl, $params) = self::parseRouteUri($uri);
 
-        $cpmd5 = md5($changeUrl.$params); // 参数+地址匹配
+        $cpmd5 = md5($changeUrl . $params); // 参数+地址匹配
         $cmd5  = md5($changeUrl); // 纯地址匹配
 
-        if(isset(self::$regularUrl['url'][$cpmd5]) || isset(self::$regularUrl['url'][$cmd5])){
-            self::$thisRule['rule'] = self::$rule[self::$regularUrl['url'][$cpmd5]] ??  self::$rule[self::$regularUrl['url'][$cmd5]];
+        if (isset(self::$regularUrl['url'][$cpmd5]) || isset(self::$regularUrl['url'][$cmd5])) {
+            self::$thisRule['rule'] = self::$rule[self::$regularUrl['url'][$cpmd5]] ?? self::$rule[self::$regularUrl['url'][$cmd5]];
             self::changeGetValue(self::$thisRule['rule']['params']); // 保存GET信息
             // 过滤多余的“/” 存在参数则传参数 存在后缀则添加后缀
             $url = '/' . ltrim((self::$thisRule['rule']['change_url'] . ($params ? '/s/' . $params : '') . self::$thisRule['rule']['suffix']), '/');
         }
-         
+
         return $url ?? $uri;
     }
 
