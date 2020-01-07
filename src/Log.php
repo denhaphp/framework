@@ -63,7 +63,7 @@ class Log
 
     public static function setConfig(string $name, array $config)
     {
-        
+
         if (!self::$config) {
             self::$config = Config::includes('log.php');
         }
@@ -165,10 +165,6 @@ class Log
     public static function __callStatic($name, $arguments)
     {
 
-        $message   = $arguments[0] ?: '';
-        $context   = $arguments[1] ?: [];
-        $levelName = $arguments[2] ?: '';
-
         // 获取默认配置
         $denha = self::setChannel('Denha');
         if (!self::$loggers[$denha->id]->getHandlers()) {
@@ -177,7 +173,7 @@ class Log
 
         // 过滤日志记录类型
         if ($denha->limitLevel($name)) {
-            self::$loggers[$denha->id]->$name($message, $context);
+            self::$loggers[$denha->id]->$name(...$arguments);
         }
 
     }
