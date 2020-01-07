@@ -67,7 +67,7 @@ class Database
             self::$do[$readWritePower][$hash] = $config;
         }
 
-        return  $this;
+        return $this;
     }
 
     public function setConfigs(array $dbConfig = [])
@@ -271,6 +271,10 @@ class Database
      */
     public function getTableName(): string
     {
+        // 链接数据库
+        $this->connect();
+        $this->parseTable();
+
         return $this->bulid['table'];
     }
 
@@ -1202,7 +1206,7 @@ class Database
 
             list($errorCode, $errorNumber, $errorMsg) = $this->link->errorInfo();
             // 存入文件
-            if ($this->config['error_log'] || 　Config::get('debug')) {
+            if (Config::get('debug') || $this->config['error_log']) {
                 Log::error('SQL ERROR :' . $errorCode . ' ' . $errorMsg . ' SQL :  ' . $this->bulid['sql']);
             }
 
