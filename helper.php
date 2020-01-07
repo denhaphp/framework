@@ -5,7 +5,7 @@ use denha\Config;
 use denha\Controller;
 use denha\HttpResource;
 use denha\Route;
-
+use denha\db\Database;
 
 if (!function_exists('abort')) {
     /**
@@ -788,7 +788,7 @@ if (!function_exists('table')) {
         static $_do;
 
         if (is_null($_do)) {
-            $_do = denha\db\BuildSql::getInstance(); //单例实例化
+            $_do = Database::getInstance(); //单例实例化
         }
 
         if ($name) {
