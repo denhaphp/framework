@@ -11,6 +11,7 @@ use denha\HttpResource;
 use denha\Template;
 use denha\Trace;
 use denha\Config;
+use denha\App;
 
 class Controller
 {
@@ -111,7 +112,7 @@ class Controller
                         'get'   => (array) HttpResource::$request['params']['get'],
                         'files' => $_FILES,
                     ],
-                    'docComment' => explode(PHP_EOL, Start::$methodDocComment),
+                    'docComment' => explode(PHP_EOL, App::$methodDocComment),
                     'ip'         => getIP(),
                     'sql'        => Trace::$sqlInfo,
                 ],

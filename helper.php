@@ -474,7 +474,7 @@ if (!function_exists('zipImg')) {
         $zipImgName = basename($name, '.' . $ext) . '_' . $size . '.' . $ext;
 
         // 如果不存在缓存 缩略图则创建缩略图
-        $cacheLists = cache('zipimglists');
+        $cacheLists = Cache::get('zipimglists');
         if (!isset($cacheLists[md5($zipImgName)])) {
             // 如何原图是否存在 根据原图=>创建新的缩略图
             $url = $path ? config('uploadfile') . $path . '/' . $name : config('uploadfile') . $name;
@@ -488,7 +488,7 @@ if (!function_exists('zipImg')) {
                 if ($res) {
                     // 保留缓存记录
                     $cacheLists[md5($zipImgName)] = $zipImgName;
-                    cache('zipimglists', $cacheLists);
+                    Cache::set('zipimglists', $cacheLists);
 
                     $url = config('uploadfile') . 'zipimg/' . $zipImgName;
                 }
