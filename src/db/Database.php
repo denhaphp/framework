@@ -892,21 +892,26 @@ class Database
     public function getTableStatus($field = '')
     {
 
+        $this->connect();
+        $this->parseTable();
+
         $this->field($field);
+        $this->parseField();
+
         $this->bulid['sql'] = 'SHOW TABLE STATUS WHERE NAME = \'' . $this->bulid['table'] . '\'';
         $result             = $this->query();
-        $list               = $result->fetch(PDO::FETCH_ASSOC);
+        $lists              = $result->fetch(PDO::FETCH_ASSOC);
 
-        if (count($this->options['field']) == 1) {
-            foreach ($list as $key => $value) {
-                if (!isset($list[$field])) {
+        if (count($this->options['field']) == 1 && $lists) {
+            foreach ($lists as $key => $value) {
+                if (!isset($lists[$field])) {
                     throw new Exception('SQL ERROR : 字段信息不存在 [' . $field . ']');
                 }
 
-                $data = $list[$field];
+                $data = $lists[$field];
             }
         } else {
-            $data = $list;
+            $data = $lists;
         }
 
         return $data;
@@ -915,10 +920,15 @@ class Database
     /** 查询表字段名 */
     public function getField($field = 'COLUMN_NAME')
     {
+        $this->connect();
+        $this->parseTable();
+
         $this->field($field);
+        $this->parseField();
+
         $where = ' WHERE table_name = \'' . $this->bulid['table'] . '\'';
-        if ($this->bulid['group']) {
-            $where .= $this->bulid['group'];
+        if ($this->options['group']) {
+            $where .= $this->parseGroup();
         }
 
         $this->bulid['sql'] = 'SELECT ' . $this->bulid['field'] . ' from information_schema.columns ' . $where;
