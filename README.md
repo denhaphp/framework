@@ -6,7 +6,7 @@ DenHa框架 —— PHP MVC框架
 
 [![Total Downloads](https://poser.pugx.org/denha/framework/downloads)](https://packagist.org/packages/denha/framework)
 [![Latest Stable Version](https://poser.pugx.org/denha/framework/v/stable)](https://packagist.org/packages/denha/framework)
-[![PHP Version](https://img.shields.io/badge/php-%3E%3D7.1-8892BF.svg)](http://www.php.net/)
+[![PHP Version](https://img.shields.io/badge/php-%3E%3D7.2-8892BF.svg)](http://www.php.net/)
 [![License](https://poser.pugx.org/denha/framework/license)](https://packagist.org/packages/denha/framework)
 
 DenHa框架 其主要特性包括：
