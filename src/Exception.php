@@ -45,7 +45,7 @@ class Exception extends \Exception
         // 保存错误日志
         if ($config['error']['save_log']) {
             self::$whoops->pushHandler(function ($exception, $inspector, $run) {
-                Log::warning($exception);
+                Log::warning($exception->getMessage() . ' From: ' . $exception->getFile() . ' On Line: ' . $exception->getLine(), $exception->getTrace());
             });
         }
 
@@ -62,10 +62,6 @@ class Exception extends \Exception
      */
     public static function run(HttpResource $httpResource)
     {
-        // if (self::$whoops) {
-        //     unset(self::$whoops);
-        // }
-
         self::$whoops = new ErrorRun;
 
         // cli模式
@@ -83,6 +79,11 @@ class Exception extends \Exception
             // $handler->setEditor(function ($file, $line) {error_log($file . $line, 3, DATA_RUN_PATH . '1.log');});
             self::$whoops->prependHandler($handler);
         }
+
+        // 保存错误日志
+        self::$whoops->pushHandler(function ($exception, $inspector, $run) {
+            Log::warning($exception->getMessage() . ' From: ' . $exception->getFile() . ' On Line: ' . $exception->getLine(), $exception->getTrace());
+        });
 
         self::$whoops->register();
 
