@@ -1202,11 +1202,11 @@ class Database
         $this->sqlInfo['sql']  = $this->bulid['sql']; // 执行Sql
 
         // 日志记录埋点
-        Log::debug('SQL:' . $this->bulid['sql'] . ' [' . $this->sqlInfo['time'] . 's]');
+        // Log::info('SQL:' . $this->bulid['sql'] . ' [' . $this->sqlInfo['time'] . 's]');
         // 调试模式
-        if (Config::get('trace')) {
-            Trace::addSql($this->sqlInfo);
-        }
+        // if (Config::get('trace')) {
+        Trace::addSql($this->sqlInfo);
+        // }
 
         // 执行成功
         if ($result) {
@@ -1229,50 +1229,4 @@ class Database
         }
 
     }
-
-    // /**
-    //  * 保存sql记录
-    //  * @date   2017-10-18T13:45:16+0800
-    //  * @author ChenMingjiang
-    //  * @return [type]                   [description]
-    //  */
-    // public function addSqlLog()
-    // {
-    //     //创建文件夹
-    //     is_dir(DATA_SQL_PATH) ? '' : mkdir(DATA_SQL_PATH, 0755, true);
-
-    //     $info = '------ ' . $this->sqlInfo['time'];
-    //     $info .= ' | ' . date('Y-m-d H:i:s', TIME);
-    //     $info .= ' | ip:' . Config::IP();
-    //     $info .= ' | Url:' . URL . '/' . Route::$uri;
-    //     $info .= PHP_EOL . PHP_EOL;
-
-    //     // 如果存在sql信息 并且开启日志记录
-    //     if ($this->sqlInfo && $this->config['save_log']) {
-    //         $basePath = DATA_SQL_PATH . $this->options['database'] . DS;
-    //         is_dir($basePath) ? '' : mkdir($basePath, 0755, true);
-
-    //         $content = $this->sqlInfo['sql'] . PHP_EOL;
-
-    //         // 记录explain
-    //         if ($this->config['sql_explain'] && isset($this->sqlInfo['explain'])) {
-    //             foreach ($this->sqlInfo['explain'] as $explain) {
-    //                 $content .= json_encode($explain) . PHP_EOL;
-    //             }
-    //         }
-
-    //         $path = $basePath . (isset($this->options['type']) ? strtolower($this->options['type']) : 'other');
-    //         $path .= '_' . date('Y_m_d', TIME) . '.text';
-
-    //         // 记录慢sql
-    //         if ($this->config['slow_log']) {
-    //             if ($this->sqlInfo['time'] > $this->config['slow_time']) {
-    //                 $path = $basePath . 'slow_' . date('Y_m_d', TIME) . '.text';
-    //             }
-    //         }
-
-    //         error_log($content . $info, 3, $path);
-    //     }
-    // }
-
 }
