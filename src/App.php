@@ -4,6 +4,7 @@ declare (strict_types = 1);
 namespace denha;
 
 use denha\Config;
+use denha\Controller;
 use denha\Exception;
 use denha\HttpResource;
 use denha\Log;
@@ -56,19 +57,43 @@ class App
             include_once $item;
         }
 
-        Route::main(); //解析路由
+        Route::main(); // 解析路由
 
-        // 日志记录
-        Log::setChannel('Denha', ['formatter' => ['output' => '%message%']])->debug('-------------------------------------------------------------------------');
-        Log::debug('Method:' . HttpResource::getMethod() . ' URL:' . HttpResource::getUrl() . ' Crontroller:' . MODULE . DS . CONTROLLER . DS . ACTION);
+        $view = &$this->makeRouteRun();
 
-        $this->makeRouteRun(); // 运行控制器
+        // 视图渲染
+        if (is_array($view)) {
+            Controller::fetch(...$view);
+        } else {
+            echo $view;
+        }
 
+        $this->runLog(); // 日志记录
     }
 
     protected function getFramePath()
     {
         return dirname(__DIR__) . DIRECTORY_SEPARATOR;
+    }
+
+    protected function runLog()
+    {
+
+
+        // Log::debug('Method:' . HttpResource::getMethod() . ' Uri:' . HttpResource::getUrl());
+        // Log::debug('Crontroller:' . MODULE . DS . CONTROLLER . DS . ACTION);
+        // Log::debug('Sql:', ['lists' => Trace::$sqlInfo]);
+
+      
+        Log::debug('系统信息-----------------------------------------------' . PHP_EOL, [
+            'Uri'         => HttpResource::getUrl(),
+            'Method'      => HttpResource::getMethod(),
+            'Sql'         => Trace::$sqlInfo,
+            'Ip'          => Config::IP(),
+            'Crontroller' => MODULE . DS . CONTROLLER . DS . ACTION,
+        ]);
+
+        Log::call(); // 关闭日志
     }
 
     protected function makeRouteRun()
@@ -101,9 +126,8 @@ class App
             }
         }
 
-        $method->invokeArgs(new Route::$class(), $params);
-
         self::$methodDocComment = $method->getDocComment(); // 保存方法注解信息
 
+        return $method->invokeArgs(new Route::$class(), $params);
     }
 }
