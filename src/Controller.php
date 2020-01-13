@@ -7,11 +7,11 @@ declare (strict_types = 1);
 
 namespace denha;
 
+use denha\App;
+use denha\Config;
 use denha\HttpResource;
 use denha\Template;
 use denha\Trace;
-use denha\Config;
-use denha\App;
 
 class Controller
 {
@@ -44,10 +44,10 @@ class Controller
      *                                                  trace:单个视图关闭调试模式 【默认】true：开启 fasle：关闭
      * @return [type]                                   [description]
      */
-    protected function show(string $viewPath = '', array $viewParamData = [], array $options = [])
+    protected function view(string $viewPath = '', array $viewParamData = [], array $options = [])
     {
         // 单个视图关闭调试模式
-        $trace = isset($options['trace']) ? $options['trace'] : true;
+        $options['trace'] = isset($options['trace']) ? $options['trace'] : true;
 
         $viewParamData = array_merge($viewParamData, self::$assign);
 
@@ -55,12 +55,22 @@ class Controller
             $viewParamData = array_merge($viewParamData, HttpResource::$request['params']['get']);
         }
 
+        return [$viewPath, $viewParamData, $options];
+    }
+
+    public static function fetch($viewPath = '', array $viewParamData = [], array $options = [])
+    {
+
+        // 单个视图关闭调试模式
+        $trace = isset($options['trace']) ? $options['trace'] : true;
+
         echo Template::parseContent(['view' => $viewPath, 'data' => $viewParamData]);
-       
+
         // 模块debug功能
-        if (config('trace') && $trace) {
+        if (Config::get('trace') && $trace) {
             Trace::run();
         }
+
     }
 
     /**
@@ -77,7 +87,7 @@ class Controller
      * @param  string                   $lg     [语言类型]
      * @return [type]                           [description]
      */
-    protected function ajaxReturn($status, $msg = null, $data = null): void
+    protected function ajaxReturn($status, $msg = null, $data = null): string
     {
         header("Content-Type:application/json; charset=utf-8");
 
@@ -112,8 +122,8 @@ class Controller
                         'get'   => (array) HttpResource::$request['params']['get'],
                         'files' => $_FILES,
                     ],
-                    'docComment' => explode(PHP_EOL, App::$methodDocComment),
-                    'ip'         => getIP(),
+                    'docComment' => !App::$methodDocComment ?: explode(PHP_EOL, App::$methodDocComment),
+                    'ip'         => Config::IP(),
                     'sql'        => Trace::$sqlInfo,
                 ],
             ];
@@ -125,28 +135,10 @@ class Controller
         // jsonpReturn返回
         $callback = get('callbak', 'text', '');
         if ($callback && IS_GET) {
-            exit($callback . '(' . json_encode($value) . ')');
+            return $callback . '(' . json_encode($value) . ')';
         }
 
         // 正常ajax返回
-        exit(json_encode($value));
-    }
-
-    /**
-     * jsonpReturn返回
-     * @date   2017-08-07T10:41:59+0800
-     * @author ChenMingjiang
-     * @param  array                    $value    [description]
-     * @param  string                   $callback [description]
-     * @return [type]                             [description]
-     */
-    protected function jsonpReturn(array $value, $callback = '')
-    {
-        if ($callback) {
-            exit($callback . '(' . json_encode($value) . ')');
-        } else {
-            $this->ajaxReturn($value);
-        }
-
+        return json_encode($value);
     }
 }
