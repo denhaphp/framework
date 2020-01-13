@@ -8,11 +8,9 @@
 namespace denha;
 
 use denha\Config;
-use denha\HttpResource;
-use Monolog\Formatter\LineFormatter;
+use denha\log\File;
+use denha\log\MongoDB;
 use Monolog\Handler\BufferHandler;
-use Monolog\Handler\RotatingFileHandler;
-use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
 
 class Log
@@ -20,8 +18,6 @@ class Log
     private static $instance = [];
     private static $loggers;
     private static $config;
-    private static $level;
-    private static $ext = '.log';
 
     private $id;
     private $links;
@@ -91,50 +87,26 @@ class Log
 
     }
 
-    /** [formatter 日志格式设置] */
-    public function push($output = null, $dateFormat = '', $type = null)
+    public function hander()
     {
 
-        $type       = $type ?: ($this->links['formatter']['type'] ?? 'line');
-        $output     = $output ?: ($this->links['formatter']['output'] ?? '');
-        $dateFormat = $dateFormat ?: ($this->links['formatter']['date_format'] ?? '');
-
-        if ($this->links['type'] == 'File') {
-            $this->streamHandler();
+        switch (strtoupper($this->links['type'])) {
+            case 'FILE':
+                $this->handler = (new File($this->links, $this->name))->setHander()->setFormatter()->getHander();
+                break;
+            case 'MONGODB':
+                $this->handler = (new MongoDB($this->links, $this->name))->setHander()->setFormatter()->getHander();
+                break;
+            default:
+                # code...
+                break;
         }
 
-        if ($type == 'line') {
-            $this->handler->setFormatter(new LineFormatter($output . "\n", $dateFormat, true, true));
-        }
-
-        // 保存进内存中
         if (!$this->links['realtime'] && HttpResource::getMethod() != 'CLI') {
             $this->handler = new BufferHandler($this->handler);
         }
 
         self::$loggers[$this->id]->pushHandler($this->handler);
-
-        return $this;
-    }
-
-    /** 文件日志保存 */
-    public function streamHandler()
-    {
-        // 每日递增模式
-        if ($this->links['drive']['name'] == 'daily') {
-            $fileName      = $this->links['drive']['path'];
-            $maxFiles      = $this->links['drive']['file_max'] ?? 0;
-            $this->handler = new RotatingFileHandler($fileName . self::$ext, $maxFiles);
-            $this->handler->setFilenameFormat('{date}', 'Y-m-d');
-        }
-        // 单文件模式
-        elseif ($this->links['drive']['name'] == 'single') {
-            $fileName      = $this->links['drive']['path'] . ($this->links['single']['drive']['file_name'] ?: $this->name);
-            $this->handler = new StreamHandler($fileName . self::$ext);
-        }
-
-        return $this;
-
     }
 
     /** 过滤日志记录类型 */
@@ -156,7 +128,7 @@ class Log
 
         if ($this->limitLevel($name)) {
             if (!self::$loggers[$this->id]->getHandlers()) {
-                $this->push();
+                $this->hander();
             }
             self::$loggers[$this->id]->$name($message, $context);
         }
@@ -168,14 +140,13 @@ class Log
         // 获取默认配置
         $denha = self::setChannel('Denha');
         if (!self::$loggers[$denha->id]->getHandlers()) {
-            $denha->push();
+            $denha->hander();
         }
 
         // 过滤日志记录类型
         if ($denha->limitLevel($name)) {
             self::$loggers[$denha->id]->$name(...$arguments);
         }
-
     }
 
 }
