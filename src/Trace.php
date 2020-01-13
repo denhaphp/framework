@@ -96,8 +96,10 @@ class Trace
         }
 
         $base = [
-            '请求信息'    => date('Y-m-d H:i:s', $_SERVER['REQUEST_TIME']) . ' ' . $_SERVER['SERVER_PROTOCOL'] . ' ' . $_SERVER['REQUEST_METHOD'] . ' : ' . strip_tags($_SERVER['REQUEST_URI']) . ' 运行时间 :' . number_format(microtime(true) - START_TIME, 6) . ' s 吞吐率：' . number_format(1 / (microtime(true) - START_TIME), 2) . 'req/s 内存开销:' . number_format((memory_get_usage() - START_USE_MENUS) / 1024, 2) . 'kb 文件加载:' . count(get_included_files()) . ' 配置加载:' . count(App::$config),
-            '数据库名称' => $dbName . ' 运行时间:' . (isset(self::$dbTrace['allTime']) ? self::$dbTrace['allTime'] : 0),
+            '请求信息'    => date('Y-m-d H:i:s', $_SERVER['REQUEST_TIME']) . ' ' . $_SERVER['SERVER_PROTOCOL'] . ' ' . $_SERVER['REQUEST_METHOD'] . ' : ' . strip_tags($_SERVER['REQUEST_URI']),
+            '运行时间'    => number_format(microtime(true) - START_TIME, 6) . ' s 吞吐率 : ' . number_format(1 / (microtime(true) - START_TIME), 2) . 'req/s 内存开销 : ' . number_format((memory_get_usage() - START_USE_MENUS) / 1024, 2) . 'kb',
+            '文件加载'    => count(get_included_files()) . ' 配置加载 : ' . count(App::$config),
+            '数据库名称' => $dbName . ' 运行时间 : ' . (isset(self::$dbTrace['allTime']) ? self::$dbTrace['allTime'] : 0),
             '磁盘信息'    => self::diskInfo(),
         ];
 
