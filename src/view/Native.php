@@ -193,7 +193,7 @@ class Native
         // {default:$xxx|"xxx"}
         $this->content = preg_replace('/' . $this->config->left . 'default:(.*?)[|](.*?)' . $this->config->right . '/is', '<?php echo \1 ?: \2 ; ?>', $this->content);
         //??$xx  be !isset($xx) ?: $xx
-        $this->content = preg_replace('/' . $this->config->left . '\?\?(.*?)' . $this->config->right . '/is', '<?php echo \1 ?? \1; ?>', $this->content);
+        $this->content = preg_replace('/' . $this->config->left . '\?\?(.*?)' . $this->config->right . '/is', '<?php echo \1 ?? \'\'; ?>', $this->content);
         // 机器翻译标签 {FY:xxx:en}
         $this->content = preg_replace('/' . $this->config->left . 'FY:\$(.*?):(.*?)' . $this->config->right . '/is', '<?php echo \'{FY:\'.$\1.\':\2}\'; ?>', $this->content);
         // 替换php函数 {F:XXX}  be echo XXX;
