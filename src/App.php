@@ -59,7 +59,7 @@ class App
 
         Route::main(); // 解析路由
 
-        $view = &$this->makeRouteRun();
+        $view = $this->makeRouteRun();
 
         // 视图渲染
         if (is_array($view)) {
@@ -79,12 +79,10 @@ class App
     protected function runLog()
     {
 
-
         // Log::debug('Method:' . HttpResource::getMethod() . ' Uri:' . HttpResource::getUrl());
         // Log::debug('Crontroller:' . MODULE . DS . CONTROLLER . DS . ACTION);
         // Log::debug('Sql:', ['lists' => Trace::$sqlInfo]);
 
-      
         Log::debug('系统信息-----------------------------------------------' . PHP_EOL, [
             'Uri'         => HttpResource::getUrl(),
             'Method'      => HttpResource::getMethod(),
@@ -103,8 +101,10 @@ class App
         $action = lcfirst(parsename(ACTION, 1)); // 方法名称
 
         $object = new ReflectionClass(Route::$class); // 获取类信息
+
+        $request = &HttpResource::$request;
         // 进入post提交方法
-        if ((HttpResource::$request['method'] == 'POST') && $object->hasMethod($action . 'Post')) {
+        if (($request['method'] == 'POST') && $object->hasMethod($action . 'Post')) {
             $methodAction = $action . 'Post';
         } else {
             $methodAction = $action;
