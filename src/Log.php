@@ -35,7 +35,8 @@ class Log
 
         $id = self::getId($name, $config);
 
-        if (is_null(self::$instance[$id])) {
+
+        if (!isset(self::$instance[$id])) {
 
             self::setConfig($name, $config);
 
