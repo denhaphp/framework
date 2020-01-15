@@ -25,7 +25,10 @@ class Cache
 
     public static function create($config = [])
     {
-        $config = $config ?: array_shift(Config::get('cache'));
+        if (!$config) {
+            $config = Config::get('cache');
+            array_shift($config);
+        }
 
         return CacheFactory::message($config);
     }
