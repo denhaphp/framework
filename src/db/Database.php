@@ -253,8 +253,8 @@ class Database
 
         self::getInstance(); // 实例化
 
-        $isPrefix = $options['is_prefix'] ?: true;
-        $link     = $options['link'] ?: '';
+        $isPrefix = $options['is_prefix'] ?? true;
+        $link     = $options['link'] ?? '';
 
         self::$instance->init();
         self::$instance->options['table'] = ['name' => $table, 'is_prefix' => $isPrefix];
@@ -862,27 +862,27 @@ class Database
                 break;
         }
 
-        if ($this->options['join']) {
+        if (isset($this->options['join']) && !empty($this->options['join'])) {
             $this->bulid['sql'] .= $this->parseJoin();
         }
 
-        if ($this->options['map']) {
+        if (isset($this->options['map']) && !empty($this->options['map'])) {
             $this->bulid['sql'] .= $this->parseWhere();
         }
 
-        if ($this->options['group']) {
+        if (isset($this->options['group']) && !empty($this->options['group'])) {
             $this->bulid['sql'] .= $this->parseGroup();
         }
 
-        if ($this->options['having']) {
+        if (isset($this->options['having']) && !empty($this->options['having'])) {
             $this->bulid['sql'] .= $this->parseHaving();
         }
 
-        if ($this->options['order']) {
+        if (isset($this->options['order']) && !empty($this->options['order'])) {
             $this->bulid['sql'] .= $this->parseOrder();
         }
 
-        if ($this->options['limit']) {
+        if (isset($this->options['limit']) && !empty($this->options['limit'])) {
             $this->bulid['sql'] .= $this->parseLimit();
         }
 
