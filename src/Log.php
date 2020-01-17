@@ -8,8 +8,7 @@
 namespace denha;
 
 use denha\Config;
-use denha\log\File;
-use denha\log\MongoDB;
+use denha\HttpResource;
 use Monolog\Handler\BufferHandler;
 use Monolog\Logger;
 
@@ -18,6 +17,12 @@ class Log
     private static $instance = [];
     private static $loggers;
     private static $config;
+
+    /** 加载驱动类 */
+    private static $handlerClass = [
+        'FILE'    => \denha\log\File::class,
+        'MONGODB' => \denha\log\MongoDB::class,
+    ];
 
     private $id;
     private $links;
@@ -34,7 +39,6 @@ class Log
     {
 
         $id = self::getId($name, $config);
-
 
         if (!isset(self::$instance[$id])) {
 
@@ -90,18 +94,13 @@ class Log
 
     public function hander()
     {
-
-        switch (strtoupper($this->links['type'])) {
-            case 'FILE':
-                $this->handler = (new File($this->links, $this->name))->setHander()->setFormatter()->getHander();
-                break;
-            case 'MONGODB':
-                $this->handler = (new MongoDB($this->links, $this->name))->setHander()->setFormatter()->getHander();
-                break;
-            default:
-                # code...
-                break;
+        // 加载对应驱动类
+        if (!isset(self::$handlerClass[strtoupper($this->links['type'])])) {
+            throw new Exception("Log Not Find Type:" . $this->links['type']);
         }
+
+        $driver        = &self::$handlerClass[strtoupper($this->links['type'])];
+        $this->handler = (new $driver($this->links, $this->name))->setHander()->setFormatter()->getHander();
 
         if (!$this->links['realtime'] && HttpResource::getMethod() != 'CLI') {
             $this->handler = new BufferHandler($this->handler);
