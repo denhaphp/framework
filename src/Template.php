@@ -14,25 +14,19 @@ class Template
 {
     public static $config;
 
+    /** 加载驱动类 */
+    private static $handlerClass = [
+        'Native' => \denha\view\Native::class,
+        'Vue'    => \denha\view\Vue::class,
+    ];
+
     public static function parseContent($config = [])
     {
         // 重新加载配置文件
         self::config($config);
 
-        switch (self::$config['template']) {
-            case 'Native':
-                $view = new Native(self::$config);
-                break;
-            case 'Vue':
-                $view = new Vue(self::$config);
-                break;
-            default:
-                # code...
-                break;
-        }
+        return (new self::$handlerClass[self::$config['template']](self::$config))->parseFile();
 
-        // 执行解析模板方法
-        return $view->parseFile();
     }
 
     public static function config($config = [])

@@ -167,6 +167,36 @@ class HttpResource
         // return post($name, $type, $default);
     }
 
+    public static function setModule($name)
+    {
+        self::$request['module'] = $name;
+    }
+
+    public static function getModuleName()
+    {
+        return self::$request['module'];
+    }
+
+    public static function setController($name)
+    {
+        self::$request['controller'] = $name;
+    }
+
+    public static function getControllerName()
+    {
+        return self::$request['controller'];
+    }
+
+    public static function setAction($name)
+    {
+        self::$request['action'] = $name;
+    }
+
+    public static function getActionName()
+    {
+        return self::$request['action'];
+    }
+
     /**
      * [POST过滤]
      * @date   2018-07-12T17:02:18+0800

@@ -817,11 +817,11 @@ if (!function_exists('url')) {
         }
 
         if ($location === null || $location === '') {
-            $routeUrl = '/' . str_replace('.', '/', MODULE) . '/' . CONTROLLER . '/' . ACTION;
+            $routeUrl = '/' . str_replace('.', '/', HttpResource::getModuleName()) . '/' . HttpResource::getControllerName() . '/' . HttpResource::getActionName();
         } elseif (stripos($location, '/') === false && $location != null) {
-            $routeUrl = '/' . str_replace('.', '/', MODULE) . '/' . CONTROLLER . '/' . $location;
+            $routeUrl = '/' . str_replace('.', '/', HttpResource::getModuleName()) . '/' . HttpResource::getControllerName() . '/' . $location;
         } elseif (stripos($location, '/') !== false && stripos($location, '/') !== 0 && $location != null) {
-            $routeUrl = '/' . str_replace('.', '/', MODULE) . '/' . $location;
+            $routeUrl = '/' . str_replace('.', '/', HttpResource::getModuleName()) . '/' . $location;
         } elseif (stripos($location, '/') === 0) {
             $routeUrl = $location;
         } else {

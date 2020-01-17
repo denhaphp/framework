@@ -4,6 +4,8 @@
 //-------------------------
 namespace denha\view;
 
+use denha\HttpResource;
+
 class Native
 {
     public $config = [
@@ -14,7 +16,7 @@ class Native
         'root'   => VIEW_PATH,
         'data'   => [],
     ];
-    
+
     public $content;
     public $cacheTplPath; // 缓存模板地址
 
@@ -25,30 +27,30 @@ class Native
 
     /** 执行程序 */
     public function parseFile()
-    {   
+    {
 
         // 如果长度超过255, 直接当模板内容返回
         if (strlen($this->config->view) > 255) {
             return $this->config->view;
         }
 
-        $this->parseViewPath();  // 解析文件地址
-            
+        $this->parseViewPath(); // 解析文件地址
+
         // 缓存模板地址 [模板文件地址+模板文件修改时间md5]
-        $this->cacheTplPath = DATA_TPL_PATH . md5($this->config->view) . '.php';    
+        $this->cacheTplPath = DATA_TPL_PATH . md5($this->config->view) . '.php';
 
         // 存在缓存文件则直接取缓存文件
-        if (!is_file($this->cacheTplPath)  || filemtime($this->config->view) != filemtime($this->cacheTplPath) ) {
-            $this->getContent();  // 获取模板内容
+        if (!is_file($this->cacheTplPath) || filemtime($this->config->view) != filemtime($this->cacheTplPath)) {
+            $this->getContent(); // 获取模板内容
             $this->parseInclude(); // 解析include
             $this->parseForeach(); // 解析foreach
             $this->parseValue(); // 解析foreach
             $this->parseConfStr(); // 解析foreach
             $this->save(); // 保存模板缓存
-        } 
+        }
 
         extract($this->config->data, EXTR_OVERWRITE);
-        
+
         ob_start();
         ob_implicit_flush(0);
         include $this->cacheTplPath;
@@ -69,15 +71,15 @@ class Native
 
         // 不存在模板路径
         if (!$this->config->view || $this->config->view == '') {
-            $this->config->view   = $this->config->root . str_replace('.', DS, MODULE) . DS . parseName(CONTROLLER, false) . DS . ACTION . $this->config->suffix;
+            $this->config->view = $this->config->root . str_replace('.', DS, HttpResource::getModuleName()) . DS . parseName(HttpResource::getControllerName(), false) . DS . HttpResource::getActionName() . $this->config->suffix;
         }
         // 如果有模板后缀, 直接当绝对地址
         elseif (strpos($this->config->view, $this->config->suffix) > 0) {
-            $this->config->view = $this->config->root.$this->config->view;
+            $this->config->view = $this->config->root . $this->config->view;
         }
         // 相对路径
-        elseif(stripos($this->config->view, '/') !== 0){
-            $this->config->view = $this->config->root.str_replace('.', DS, MODULE) . DS .$this->config->view.$this->config->suffix;
+        elseif (stripos($this->config->view, '/') !== 0) {
+            $this->config->view = $this->config->root . str_replace('.', DS, HttpResource::getModuleName()) . DS . $this->config->view . $this->config->suffix;
         }
 
     }
@@ -88,7 +90,8 @@ class Native
      * @author ChenMingjiang
      * @return [type]                   [description]
      */
-    public function getContent(){
+    public function getContent()
+    {
 
         if (is_file($this->config->view)) {
             $this->content = file_get_contents($this->config->view);
@@ -104,7 +107,7 @@ class Native
      * @return [type]                   [description]
      */
     public function parseInclude()
-    {   
+    {
         $regular = '#' . $this->config->left . 'include\s(.*?)' . $this->config->right . '#is';
         preg_match_all($regular, $this->content, $matches);
         if ($matches) {
@@ -130,7 +133,7 @@ class Native
     {
         $tpl = trim(str_replace('/', DS, $tpl));
         if (!$tpl) {
-            $path = $this->config->root . DS . MODULE . DS . parseName(CONTROLLER, false) . DS . ACTION . $this->config->suffix;
+            $path = $this->config->root . DS . HttpResource::getModuleName() . DS . parseName(HttpResource::getControllerName(), false) . DS . HttpResource::getActionName() . $this->config->suffix;
         }
         // 绝对路径 appliaction目录开始
         elseif (stripos($tpl, DS) === 0) {
@@ -138,7 +141,7 @@ class Native
         }
         // 相对路径
         else {
-            $path = $this->config->root . DS . MODULE . DS . $tpl . $this->config->suffix;
+            $path = $this->config->root . DS . HttpResource::getModuleName() . DS . $tpl . $this->config->suffix;
         }
 
         $path = str_replace('\\', DS, $path);
@@ -151,7 +154,6 @@ class Native
 
         return $content;
     }
-    
 
     /**
      * 解析foreach
@@ -191,13 +193,12 @@ class Native
         // {$xxx} be echo $xxx;
         $this->content = preg_replace('/' . $this->config->left . '\$(.*?)' . $this->config->right . '/is', '<?php echo $\1; ?>', $this->content);
         // {default:$xxx|"xxx"}
-        $this->content = preg_replace('/' . $this->config->left . 'default:(.*?)[|](.*?)' . $this->config->right . '/is', '<?php echo \1 ?: \2 ; ?>', $this->content);
+        $this->content = preg_replace('/' . $this->config->left . 'default:(.*?)[|](.*?)' . $this->config->right . '/is', '<?php echo \1 ?? \2 ; ?>', $this->content);
         //??$xx  be !isset($xx) ?: $xx
         $this->content = preg_replace('/' . $this->config->left . '\?\?(.*?)' . $this->config->right . '/is', '<?php echo \1 ?? \'\'; ?>', $this->content);
         // 机器翻译标签 {FY:xxx:en}
         $this->content = preg_replace('/' . $this->config->left . 'FY:\$(.*?):(.*?)' . $this->config->right . '/is', '<?php echo \'{FY:\'.$\1.\':\2}\'; ?>', $this->content);
-        // 替换php函数 {F:XXX}  be echo XXX;
-        $this->content = preg_replace('/' . $this->config->left . 'F:(.*?)' . $this->config->right . '/', '<?php echo \1; ?>', $this->content); //替换php函数 {:XXX}  be echo XXX;
+        //替换php函数 {:XXX}  be echo XXX;
         $this->content = preg_replace('/' . $this->config->left . ':(.*?)' . $this->config->right . '/', '<?php echo \1; ?>', $this->content);
         // 替换{if XXX}
         $this->content = preg_replace('/' . $this->config->left . 'if(.*?)' . $this->config->right . '/is', '<?php if(\1){; ?>', $this->content);
@@ -227,18 +228,18 @@ class Native
         }
     }
 
-     /**
+    /**
      * 保存编译文件
      * @date   2019-12-17T09:37:19+0800
      * @author ChenMingjiang
      * @return [type]                   [description]
      */
-    public  function save()
+    public function save()
     {
         // 创建缓存目录
         is_dir(DATA_TPL_PATH) ? '' : mkdir(DATA_TPL_PATH, 0755, true);
 
-        file_put_contents($this->cacheTplPath,$this->content);
+        file_put_contents($this->cacheTplPath, $this->content);
 
         $time = filemtime($this->config->view);
 

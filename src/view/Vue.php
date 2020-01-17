@@ -5,6 +5,8 @@
 //-------------------------
 namespace denha\view;
 
+use denha\HttpResource;
+
 class Vue
 {
 
@@ -14,7 +16,7 @@ class Vue
         'right'  => '}',
         'suffix' => '.html',
         'root'   => VIEW_PATH,
-        'prefix' =>'php-',
+        'prefix' => 'php-',
         'data'   => [],
     ];
 
@@ -23,7 +25,7 @@ class Vue
 
     public function __construct($config)
     {
-        $this->config = (object)array_merge($this->config, $config);
+        $this->config = (object) array_merge($this->config, $config);
     }
 
     /** 执行程序 */
@@ -31,15 +33,15 @@ class Vue
     {
         // 路径不存在
         if (!$this->config->view || $this->config->view == '') {
-            $this->config->view   = $this->config->root . str_replace('.', DS, MODULE) . DS . parseName(CONTROLLER, false) . DS . ACTION . $this->config->suffix;
+            $this->config->view = $this->config->root . str_replace('.', DS, HttpResource::getModuleName()) . DS . parseName(HttpResource::getControllerName(), false) . DS . HttpResource::getActionName() . $this->config->suffix;
         }
 
         // 缓存模板地址 [模板文件地址+模板文件修改时间md5]
         $this->cacheTplPath = DATA_TPL_PATH . md5($this->config->view) . '.php';
 
         // 存在缓存文件则直接取缓存文件
-        if (!is_file($this->cacheTplPath) || filemtime($this->config->view) != filemtime($this->cacheTplPath) ) {
-            $this->parseFileContent();  // 获取模板内容
+        if (!is_file($this->cacheTplPath) || filemtime($this->config->view) != filemtime($this->cacheTplPath)) {
+            $this->parseFileContent(); // 获取模板内容
             $this->parseInclude(); // 解析include
             $this->parseForeach(); // 解析foreach
             $this->parseIf(); // 解析if
@@ -48,10 +50,10 @@ class Vue
             $this->parseValue(); // 解析foreach
             $this->parseConfStr(); // 解析foreach
             $this->save(); // 保存模板缓存
-        } 
+        }
 
         extract($this->config->data, EXTR_OVERWRITE);
-        
+
         ob_start();
         ob_implicit_flush(0);
         include $this->cacheTplPath;
@@ -98,10 +100,10 @@ class Vue
      */
     public function parseInclude()
     {
-        $match = $this->match($this->content,'include');
+        $match = $this->match($this->content, 'include');
 
-        if($match){
-            $content = $this->parseIncludeFile($match['value']);
+        if ($match) {
+            $content       = $this->parseIncludeFile($match['value']);
             $this->content = str_replace($match['html'], $content, $this->content);
             $this->parseInclude();
         }
@@ -118,7 +120,7 @@ class Vue
     {
         $tpl = trim(str_replace('/', DS, $tpl));
         if (!$tpl) {
-            $path = $this->config->root . DS . MODULE . DS . parseName(CONTROLLER, false) . DS . ACTION . $this->config->suffix;
+            $path = $this->config->root . DS . HttpResource::getModuleName() . DS . parseName(HttpResource::getControllerName(), false) . DS . HttpResource::getActionName() . $this->config->suffix;
         }
         // 绝对路径 appliaction目录开始
         elseif (stripos($tpl, DS) === 0) {
@@ -126,7 +128,7 @@ class Vue
         }
         // 相对路径
         else {
-            $path = $this->config->root . DS . MODULE . DS . $tpl . $this->config->suffix;
+            $path = $this->config->root . DS . HttpResource::getModuleName() . DS . $tpl . $this->config->suffix;
         }
 
         $path = str_replace('\\', DS, $path);
@@ -141,10 +143,11 @@ class Vue
     }
 
     /** foreach渲染 */
-    public function parseForeach(){
-        $match = $this->match($this->content,'for');
-        if($match){
-            $content = '<?php foreach('.$match['value'].'){ ?>';
+    public function parseForeach()
+    {
+        $match = $this->match($this->content, 'for');
+        if ($match) {
+            $content = '<?php foreach(' . $match['value'] . '){ ?>';
             $content .= str_replace($match['exp'], '', $match['html']);
             $content .= '<?php } ?>';
 
@@ -153,10 +156,11 @@ class Vue
         }
     }
 
-    public function parseIf(){
-        $match = $this->match($this->content,'if');
-        if($match){
-            $content = '<?php if('.$match['value'].'){ ?>';
+    public function parseIf()
+    {
+        $match = $this->match($this->content, 'if');
+        if ($match) {
+            $content = '<?php if(' . $match['value'] . '){ ?>';
             $content .= str_replace($match['exp'], '', $match['html']);
             $content .= '<?php } ?>';
 
@@ -170,10 +174,10 @@ class Vue
      * @return string 解析后的模板内容
      */
     public function parseElseif()
-    {   
-        $match = $this->match($this->content,'elseif');
-        if($match){
-            $content = '<?php elseif('.$match['value'].'){ ?>';
+    {
+        $match = $this->match($this->content, 'elseif');
+        if ($match) {
+            $content = '<?php elseif(' . $match['value'] . '){ ?>';
             $content .= str_replace($match['exp'], '', $match['html']);
             $content .= '<?php } ?>';
 
@@ -187,9 +191,9 @@ class Vue
      */
     public function parseElse()
     {
-        $match = $this->match($this->content,'else');
-        if($match){
-            $content = '<?php else('.$match['value'].'){ ?>';
+        $match = $this->match($this->content, 'else');
+        if ($match) {
+            $content = '<?php else(' . $match['value'] . '){ ?>';
             $content .= str_replace($match['exp'], '', $match['html']);
             $content .= '<?php } ?>';
 
@@ -244,12 +248,12 @@ class Vue
      * @author ChenMingjiang
      * @return [type]                   [description]
      */
-    public  function save()
+    public function save()
     {
         // 创建缓存目录
         is_dir(DATA_TPL_PATH) ? '' : mkdir(DATA_TPL_PATH, 0755, true);
 
-        file_put_contents($this->cacheTplPath,$this->content);
+        file_put_contents($this->cacheTplPath, $this->content);
 
         $time = filemtime($this->config->view);
 
@@ -266,7 +270,7 @@ class Vue
      */
     public function match($content, $directive = '[\w]+', $val = '[^\4]*?')
     {
-        $reg   = '#<(?<tag>[\w]+)[^>]*?\s(?<exp>' . preg_quote($this->config->prefix)
+        $reg = '#<(?<tag>[\w]+)[^>]*?\s(?<exp>' . preg_quote($this->config->prefix)
             . '(?<directive>' . $directive
             . ')=([\'"])(?<value>' . $val . ')\4)[^>]*>#s';
         $match = null;
@@ -277,7 +281,7 @@ class Vue
         $sub = $match[0];
         $tag = $match['tag'];
         /* 如果是单标签, 就直接返回 */
-        if (substr($sub, -2) == '/>' || in_array($tag, ['br','img','meta','link','param','input'])) {
+        if (substr($sub, -2) == '/>' || in_array($tag, ['br', 'img', 'meta', 'link', 'param', 'input'])) {
             $match['html'] = $match[0];
             return $match;
         }
