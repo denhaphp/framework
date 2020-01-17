@@ -301,6 +301,8 @@ class Database
             && stripos($field, 'AS') === false
             && stripos($field, 'DISTINCT') === false
             && stripos($field, 'FIELD') === false
+            && stripos($field, '(') === false
+            && stripos($field, ')') === false
         ) {
             $field = stripos($field, '.') !== false ? str_replace('.', '.`', $field) . '`' : '`' . $field . '`';
         }
