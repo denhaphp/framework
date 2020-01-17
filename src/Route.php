@@ -8,12 +8,12 @@ declare (strict_types = 1);
 namespace denha;
 
 use denha\Config;
+use denha\HttpResource;
 
 class Route
 {
-    public static $path;
-    public static $class;
-    public static $uri;
+    public static $class; // 请求类
+    public static $uri; // 请求路由地址
     public static $rule   = [];
     public static $config = []; // 配置信息
     // 当前路由信息
@@ -22,50 +22,93 @@ class Route
         'rule' => [], // 改写路由信息
     ];
     public static $id         = 0;
-    public static $regularUrl = []; // 路由规则数组
+    public static $regularUrl = []; // 路由规则匹配数组
 
-    // 执行主体
-    public static function main()
+    /** 获取配置信息 */
+    public static function getConfig()
     {
-        self::$config          = Config::get('route');
-        self::$thisRule['uri'] = self::$uri = self::parseUri();
+        if (!self::$config) {
+            self::$config = Config::get('route');
+        }
+    }
 
-        // 检查规则路由
-        if (self::$config['open_route']) {
-            // 加载路由规则文件
-            $routeFiles = (array) self::$config['route_files'];
-            foreach ($routeFiles as $file) {
-                include_once $file;
-            }
+    public static function make($class = '')
+    {
+        self::getConfig();
 
-            // 获取当前url
-            self::$uri = self::getRouteUrl('/' . self::$uri);
+        $uri = self::$thisRule['uri'] = self::$uri = $class ?: self::parseUri();
+
+        $params = '';
+        if (strpos($uri, '/s/') !== false) {
+            list($uri, $params) = explode('/s/', $uri);
         }
 
-        // 转换Url参数为GET参数
-        $uriArr = explode('/s/', self::$uri);
-        if (isset($uriArr[1])) {
-            self::changeGetValue($uriArr[1], ['isGet' => true]);
-        }
+        self::changeGetValue($params, ['isGet' => true]); //  转换Url参数为GET参数
 
-        $routeArr = explode('/', ltrim(reset($uriArr), '/'));
+        $route = explode('\\', str_replace('/', '\\', ltrim($uri, '/')));
 
         // 开启指定结构层数
         if (self::$config['open_level']) {
-            $routeArr = array_values(array_slice($routeArr, 0, self::$config['level']));
+            $route = array_values(array_slice($route, 0, self::$config['level']));
         }
 
-        define('MODULE', implode('.', array_slice($routeArr, 0, -2)));
-        define('CONTROLLER', ucfirst(preg_replace_callback('/_([a-zA-Z])/', function ($match) {
+        HttpResource::setModule(implode('.', array_slice($route, 0, -2)));
+        HttpResource::setController(ucfirst(preg_replace_callback('/_([a-zA-Z])/', function ($match) {
             return strtoupper($match[1]);
-        }, implode(array_slice($routeArr, -2, 1)))));
+        }, implode(array_slice($route, -2, 1)))));
+        HttpResource::setAction(end($route));
 
-        define('ACTION', end($routeArr));
+        return self::$class = implode('\\', ['app', str_replace('.', '\\', HttpResource::getModuleName()), HttpResource::getControllerName()]);
 
-        $class = ['app', str_replace('.', '\\', MODULE), CONTROLLER];
+    }
 
-        return self::$class = implode('\\', $class);
+    // 解析路由
+    private static function parseUri()
+    {
 
+        if (isset($_SERVER['REQUEST_URI'])) {
+            $uri = $_SERVER['REQUEST_URI'];
+        } elseif (isset($_SERVER['argv'][1])) {
+            $uri = $_SERVER['argv'][1];
+        }
+
+        if (!empty($_SERVER['SCRIPT_NAME']) && strpos($uri, $_SERVER['SCRIPT_NAME']) === 0) {
+            $uri = substr($uri, strlen($_SERVER['SCRIPT_NAME']));
+        }
+
+        // 删除"/"
+        $uri = trim($uri, '/');
+
+        if (!$uri) {
+            return false;
+        }
+
+        // 删除参数
+        if (($pos = strpos($uri, '?')) !== false) {
+            $uri = substr($uri, 0, $pos);
+        }
+
+        // 检查规则路由
+        if (self::$config['open_route']) {
+            self::loadRouteFiles(); // 载入路由规则文件
+            $uri = self::getRouteUrl('/' . $uri); // 获取当前url
+        }
+
+        if ($uri) {
+            return $uri;
+        } else {
+            return false;
+        }
+    }
+
+    /** 载入路由规则文件 */
+    private static function loadRouteFiles()
+    {
+        // 加载路由规则文件
+        $routeFiles = (array) self::$config['route_files'];
+        foreach ($routeFiles as $file) {
+            include_once $file;
+        }
     }
 
     /**
@@ -239,40 +282,6 @@ class Route
     {
         $res = (isset($_GET[$flag]) && $_GET[$flag] ? strip_tags($_GET[$flag]) : $value);
         return $res;
-    }
-
-    // 解析路由
-    private static function parseUri()
-    {
-        if (isset($_SERVER['REQUEST_URI'])) {
-            $uri = $_SERVER['REQUEST_URI'];
-        } elseif (isset($_SERVER['argv'][1])) {
-            $uri = $_SERVER['argv'][1];
-        }
-
-        if (!empty($_SERVER['SCRIPT_NAME'])) {
-            if (strpos($uri, $_SERVER['SCRIPT_NAME']) === 0) {
-                $uri = substr($uri, strlen($_SERVER['SCRIPT_NAME']));
-            }
-        }
-
-        // 删除"/"
-        $uri = trim($uri, '/');
-        if (!$uri) {
-            return false;
-        }
-
-        // 删除参数
-        $pos = strpos($uri, '?');
-        if ($pos !== false) {
-            $uri = substr($uri, 0, $pos);
-        }
-
-        if ($uri) {
-            return $uri;
-        } else {
-            return false;
-        }
     }
 
     /**
