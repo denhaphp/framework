@@ -49,10 +49,9 @@ class Cache
 
             $config = array_merge(Config::get('cache')[$name], $options);
             return Cache::create($config);
-        } else {
-            return Cache::channel($name);
         }
 
+        return Cache::channel($name);
     }
 
 }
