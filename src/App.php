@@ -18,46 +18,35 @@ class App
     public static $httpResource     = [];
     public static $methodDocComment = ''; // 当前运行方法注解
 
-    /**
-     * [start description]
-     * @date   2017-07-14T16:12:51+0800
-     * @author ChenMingjiang
-     * @param  string                   $client [配置文件名称]
-     * @param  string                   $route  [路由模式 mca smca ca]
-     * @return [type]                           [description]
-     */
-    public function start($configPath = '')
-    {
+    public static $appPath;
+    public static $build = ['env' => 'env.php', 'config' => 'config.php'];
 
+    /**
+     * [__construct description]
+     * @date   2020-01-17T15:48:41+0800
+     * @author ChenMingjiang
+     * @param  string                   $configPath [配置文件地址]
+     */
+    public function __construct($configPath = '')
+    {
         Exception::run(HttpResource::initInstance()); // 加载错误面板
 
-        $appPath = $this->getFramePath();
-        // 加载配置文件
-        if (is_file($appPath . 'env.php')) {
-            include_once $appPath . 'env.php';
-        }
+        self::$appPath = $this->getFramePath();
 
-        // 获取配置文档信息
-        if ($configPath) {
-            self::$config = Config::includes(['config.php', $configPath]);
-        } else {
-            self::$config = Config::includes();
-        }
+        $this->loadEnv();
+
+        $this->loadConfig($configPath);
 
         if (!self::$config['debug']) {
             Exception::hide(HttpResource::initInstance(), self::$config); // 隐藏错误提示
         }
 
-        // 载入助手函数
-        foreach (self::$config['help_paths'] as $item) {
-            if (!is_file($item)) {
-                throw new Exception('path: ' . $item . ' is not file from config->help_paths');
-            }
+        $this->loadHelper();
+    }
 
-            include_once $item;
-        }
-
-        Route::main(); // 解析路由
+    public function mark($class = '')
+    {
+        Route::make($class); // 解析路由
 
         $view = $this->makeRouteRun();
 
@@ -71,6 +60,37 @@ class App
         $this->runLog(); // 日志记录
     }
 
+    /** 加载配置文件Env */
+    public function loadEnv()
+    {
+        if (is_file(self::$appPath . self::$build['env'])) {
+            include_once self::$appPath . self::$build['env'];
+        }
+    }
+
+    /** [loadConfig description] */
+    public function loadConfig($path)
+    {
+        // 获取配置文档信息
+        if ($path) {
+            self::$config = Config::includes([self::$build['config'], $path]);
+        } else {
+            self::$config = Config::includes();
+        }
+    }
+
+    /** 载入助手函数 */
+    public function loadHelper()
+    {
+        foreach (self::$config['help_paths'] as $item) {
+            if (!is_file($item)) {
+                throw new Exception('path: ' . $item . ' is not file from config->help_paths');
+            }
+
+            include_once $item;
+        }
+    }
+
     protected function getFramePath()
     {
         return dirname(__DIR__) . DIRECTORY_SEPARATOR;
@@ -78,17 +98,12 @@ class App
 
     protected function runLog()
     {
-
-        // Log::debug('Method:' . HttpResource::getMethod() . ' Uri:' . HttpResource::getUrl());
-        // Log::debug('Crontroller:' . MODULE . DS . CONTROLLER . DS . ACTION);
-        // Log::debug('Sql:', ['lists' => Trace::$sqlInfo]);
-
         Log::debug('系统信息-----------------------------------------------' . PHP_EOL, [
             'Uri'         => HttpResource::getUrl(),
             'Method'      => HttpResource::getMethod(),
+            'Crontroller' => HttpResource::getModuleName() . DS . HttpResource::getControllerName() . DS . HttpResource::getActionName(),
             'Sql'         => Trace::$sqlInfo,
             'Ip'          => Config::IP(),
-            'Crontroller' => MODULE . DS . CONTROLLER . DS . ACTION,
         ]);
 
         Log::call(); // 关闭日志
@@ -98,7 +113,7 @@ class App
     {
 
         // 日志记录
-        $action = lcfirst(parsename(ACTION, 1)); // 方法名称
+        $action = lcfirst(parsename(HttpResource::getActionName(), 1)); // 方法名称
 
         $object = new ReflectionClass(Route::$class); // 获取类信息
 
@@ -130,4 +145,5 @@ class App
 
         return $method->invokeArgs(new Route::$class(), $params);
     }
+
 }
