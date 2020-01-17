@@ -29,21 +29,32 @@ class Exception extends \Exception
 
         self::$whoops = new ErrorRun;
 
-        header("http/1.1 404 not found");
-        header("status: 404 not found");
-
         if ($httpResource->getMethod() == 'CLI') {
-            self::$whoops->prependHandler(function () {echo 'denha have a error so kill';});
+            self::$whoops->prependHandler(function () {
+                echo 'denha have a error so kill';
+            });
         } elseif ($httpResource->isAjax()) {
-            self::$whoops->prependHandler(function () {echo '{"errord":"denha have a error so kill"}';});
+            self::$whoops->prependHandler(function () {
+
+                header("http/1.1 404 not found");
+                header("status: 404 not found");
+
+                echo '{"errord":"denha have a error so kill"}';
+            });
         } else {
-            if (is_file($config['error']['tpl'])) {
-                self::$whoops->prependHandler(function () use ($config) {return include $config['error']['tpl'];});
+            if (isset($config['error']['tpl']) && is_file($config['error']['tpl'])) {
+                self::$whoops->prependHandler(function () use ($config) {
+
+                    header("http/1.1 404 not found");
+                    header("status: 404 not found");
+
+                    return include $config['error']['tpl'];
+                });
             }
         }
 
         // 保存错误日志
-        if ($config['error']['save_log']) {
+        if (isset($config['error']['save_log']) && $config['error']['save_log']) {
             self::$whoops->pushHandler(function ($exception, $inspector, $run) {
                 Log::warning($exception->getMessage() . ' From: ' . $exception->getFile() . ' On Line: ' . $exception->getLine(), $exception->getTrace());
             });
