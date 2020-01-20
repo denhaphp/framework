@@ -61,7 +61,7 @@ class App
     }
 
     /** 加载配置文件Env */
-    public function loadEnv()
+    protected function loadEnv()
     {
         if (is_file(self::$appPath . self::$build['env'])) {
             include_once self::$appPath . self::$build['env'];
@@ -69,7 +69,7 @@ class App
     }
 
     /** [loadConfig description] */
-    public function loadConfig($path)
+    protected function loadConfig($path)
     {
         // 获取配置文档信息
         if ($path) {
@@ -80,7 +80,7 @@ class App
     }
 
     /** 载入助手函数 */
-    public function loadHelper()
+    protected function loadHelper()
     {
         foreach (self::$config['help_paths'] as $item) {
             if (!is_file($item)) {

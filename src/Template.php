@@ -7,9 +7,6 @@ declare (strict_types = 1);
 
 namespace denha;
 
-use denha\view\Native;
-use denha\view\Vue;
-
 class Template
 {
     public static $config;

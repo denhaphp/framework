@@ -39,11 +39,15 @@ class Route
         $uri = self::$thisRule['uri'] = self::$uri = $class ?: self::parseUri();
 
         $params = '';
-        if (strpos($uri, '/s/') !== false) {
+        if ($uri && strpos($uri, '/s/') !== false) {
             list($uri, $params) = explode('/s/', $uri);
         }
 
         self::changeGetValue($params, ['isGet' => true]); //  转换Url参数为GET参数
+
+        if ($uri === '' || $uri === false) {
+            throw new Exception('Not Find Url');
+        }
 
         $route = explode('\\', str_replace('/', '\\', ltrim($uri, '/')));
 
@@ -72,15 +76,9 @@ class Route
             $uri = $_SERVER['argv'][1];
         }
 
+        // 过滤SCRIPT_NAME
         if (!empty($_SERVER['SCRIPT_NAME']) && strpos($uri, $_SERVER['SCRIPT_NAME']) === 0) {
             $uri = substr($uri, strlen($_SERVER['SCRIPT_NAME']));
-        }
-
-        // 删除"/"
-        $uri = trim($uri, '/');
-
-        if (!$uri) {
-            return false;
         }
 
         // 删除参数
@@ -91,7 +89,7 @@ class Route
         // 检查规则路由
         if (self::$config['open_route']) {
             self::loadRouteFiles(); // 载入路由规则文件
-            $uri = self::getRouteUrl('/' . $uri); // 获取当前url
+            $uri = self::getRouteUrl($uri); // 获取当前url
         }
 
         if ($uri) {
@@ -178,17 +176,15 @@ class Route
      */
     public static function parseRouteUri(string $uri)
     {
-        $uriArr = explode('/s/', $uri);
 
-        if (isset($uriArr[1])) {
-            $params    = $uriArr[1];
-            $changeUrl = $uriArr[0];
+        if (strpos($uri, '/s/') !== false) {
+            list($params, $changeUrl) = explode('/s/', $uri);
         } else {
             $params    = '';
             $changeUrl = $uri;
         }
 
-        $changeUrl = '/' . ltrim(trim($changeUrl), '/');
+        $changeUrl = '/' . trim(trim($changeUrl), '/');
 
         return [$changeUrl, $params];
     }
@@ -207,8 +203,8 @@ class Route
 
         // 获取后缀
         $suffix = pathinfo($changeUrl, PATHINFO_EXTENSION);
+        // 删除后缀
         if ($suffix) {
-            // 删除后缀
             $changeUrl = str_replace('.' . $suffix, '', $changeUrl);
         }
 
