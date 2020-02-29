@@ -83,8 +83,6 @@ if (!function_exists('auth')) {
     }
 }
 
-
-
 if (!function_exists('config')) {
     /**
      * 获取配置基础信息
@@ -434,16 +432,16 @@ if (!function_exists('imgUrl')) {
 
         foreach ($imgName as $imgName) {
             if (!$imgName) {
-                $url = config('ststic') . '/default.png';
+                $url = HttpResource::getHost() . config('ststic') . '/default.png';
                 $url = !$host ? $url : $host . $url;
             } elseif ($size) {
                 $url = zipimg($imgName, $path, $size);
                 $url = !$host ? $url : $host . $url;
             } else {
                 if ($path) {
-                    $url = config('uploadfile') . $path . '/' . $imgName;
+                    $url = HttpResource::getHost() . config('uploadfile') . $path . '/' . $imgName;
                 } else {
-                    $url = config('uploadfile') . $imgName;
+                    $url = HttpResource::getHost() . config('uploadfile') . $imgName;
                 }
 
                 $url = !$host ? $url : $host . $url;
@@ -477,7 +475,7 @@ if (!function_exists('zipImg')) {
         $cacheLists = Cache::get('zipimglists');
         if (!isset($cacheLists[md5($zipImgName)])) {
             // 如何原图是否存在 根据原图=>创建新的缩略图
-            $url = $path ? config('uploadfile') . $path . '/' . $name : config('uploadfile') . $name;
+            $url = $path ? HttpResource::getHost() . config('uploadfile') . $path . '/' . $name : HttpResource::getHost() . config('uploadfile') . $name;
 
             if (imgExists($url)) {
                 $size   = explode('x', $size);
@@ -490,13 +488,13 @@ if (!function_exists('zipImg')) {
                     $cacheLists[md5($zipImgName)] = $zipImgName;
                     Cache::set('zipimglists', $cacheLists);
 
-                    $url = config('uploadfile') . 'zipimg/' . $zipImgName;
+                    $url = HttpResource::getHost() . config('uploadfile') . 'zipimg/' . $zipImgName;
                 }
             } else {
-                $url = config('ststic') . '/default.png';
+                $url = HttpResource::getHost() . config('ststic') . '/default.png';
             }
         } else {
-            $url = config('uploadfile') . 'zipimg/' . $cacheLists[md5($zipImgName)];
+            $url = HttpResource::getHost() . config('uploadfile') . 'zipimg/' . $cacheLists[md5($zipImgName)];
         }
 
         return $url;
@@ -615,8 +613,6 @@ if (!function_exists('response')) {
         $data = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); // 获取返回的状态码
 
-        curl_close($ch); // 关闭CURL会话
-
         if ($debug) {
             print_r('-------Curl开启-----' . PHP_EOL);
             print_r('-------输入参数Url-----' . PHP_EOL);
@@ -657,6 +653,8 @@ if (!function_exists('response')) {
         if ($isCode) {
             $res = ['code' => $code, 'data' => $res];
         }
+
+        curl_close($ch); // 关闭CURL会话
 
         return $res;
     }
