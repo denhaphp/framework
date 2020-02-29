@@ -134,7 +134,7 @@ class Controller
 
         // jsonpReturn返回
         $callback = get('callbak', 'text', '');
-        if ($callback && IS_GET) {
+        if ($callback && HttpResource::getMethod() === 'GET') {
             return $callback . '(' . json_encode($value) . ')';
         }
 
