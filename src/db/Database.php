@@ -23,6 +23,8 @@ class Database
     public $options; // 记录参数信息$
     public $bulid; // 记录构造Sql;
 
+    public static $startTrans = false; // 当前开启事务的是否为了保证数据准确关闭读写分离
+
     /** @var [power] [读写类型权限] */
     private $power = [
         'read'  => ['SELECT', 'COUNT'],
@@ -139,12 +141,25 @@ class Database
         return $this->sqlInfo['sql'];
     }
 
-    /** 链接 */
-    public function connect()
+    /**
+     * 链接
+     * @date   2020-02-15T17:17:05+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $type [1:读 2:写]
+     * @return [type]                   [description]
+     */
+    public function connect(int $type = 0)
     {
-
-        // 根据Sql类型选择链接数据库
-        in_array($this->options['type'], $this->power['write']) ? $this->connectWrite() : $this->connectRead();
+        if (self::$startTrans === true) {
+            $this->connectWrite();
+        } elseif ($type === 0) {
+            // 根据Sql类型选择链接数据库
+            in_array($this->options['type'], $this->power['write']) ? $this->connectWrite() : $this->connectRead();
+        } elseif ($type === 1) {
+            $this->connectRead();
+        } elseif ($type === 2) {
+            $this->connectWrite();
+        }
 
         if (!$this->link->getAttribute(PDO::ATTR_SERVER_INFO)) {
             throw new Exception('link infomation abnor');
@@ -793,7 +808,7 @@ class Database
 
     public function parseHaving()
     {
-        $this->bulid['having'] = ' HAVING ' . $this->addFieldTag($field);
+        $this->bulid['having'] = ' HAVING ' . $this->addFieldTag($this->options['having']);
 
         return $this->bulid['order'];
     }
@@ -1150,6 +1165,7 @@ class Database
     public function startTrans()
     {
         // 链接数据库
+        self::$startTrans = true; // 开启事务标签
         $this->connect();
         $this->link->beginTransaction();
         return true;
@@ -1170,6 +1186,7 @@ class Database
         // 链接数据库
         $this->connect();
         $this->link->commit();
+        self::$startTrans = false; // 开启事务标签
         return true;
     }
 
