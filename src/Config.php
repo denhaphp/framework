@@ -89,7 +89,7 @@ class Config
                     }
                 }
 
-                self::$includes[$md5] = array_merge(self::$includes[$md5], self::$includes[$oneMd5]);
+                self::$includes[$md5] = self::$includes[$md5] ? array_merge(self::$includes[$md5], self::$includes[$oneMd5]) : self::$includes[$oneMd5];
 
             }
         }
