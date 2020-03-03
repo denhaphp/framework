@@ -433,18 +433,21 @@ if (!function_exists('imgUrl')) {
         foreach ($imgName as $imgName) {
             if (!$imgName) {
                 $url = HttpResource::getHost() . config('ststic') . '/default.png';
-                $url = !$host ? $url : $host . $url;
             } elseif ($size) {
                 $url = zipimg($imgName, $path, $size);
-                $url = !$host ? $url : $host . $url;
             } else {
                 if ($path) {
-                    $url = HttpResource::getHost() . config('uploadfile') . $path . '/' . $imgName;
+                    $url = $path . '/' . $imgName;
                 } else {
-                    $url = HttpResource::getHost() . config('uploadfile') . $imgName;
+                    $url = $imgName;
                 }
 
-                $url = !$host ? $url : $host . $url;
+                if ($host && $imgName) {
+                    $url = $host . $url;
+                } else {
+                    $url = HttpResource::getHost() . config('uploadfile') . $url;
+                }
+
             }
 
             $data[] = $url;
