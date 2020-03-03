@@ -58,16 +58,13 @@ class Database
     /** 数据库配置读取 */
     public function setConfig(array $config)
     {
-        $readWritePower = $config['read_write_power'] ?? 0;
-        $hash           = md5(json_encode($config));
-        $config['dns']  = $this->parseDNS($config);
+        $type = [0 => 'all', 1 => 'write', 2 => 'read'];
 
-        if ($readWritePower == 0) {
-            self::$do[1][$hash] = $config;
-            self::$do[2][$hash] = $config;
-        } else {
-            self::$do[$readWritePower][$hash] = $config;
-        }
+        $power         = $type[($config['read_write_power'] ?? 0)];
+        $hash          = md5(json_encode($config));
+        $config['dns'] = $this->parseDNS($config);
+
+        self::$do[$power][$hash] = $config;
 
         return $this;
     }
@@ -145,19 +142,14 @@ class Database
      * 链接
      * @date   2020-02-15T17:17:05+0800
      * @author ChenMingjiang
-     * @param  [type]                   $type [1:读 2:写]
      * @return [type]                   [description]
      */
-    public function connect(int $type = 0)
+    public function connect()
     {
-        if (self::$startTrans === true) {
-            $this->connectWrite();
-        } elseif ($type === 0) {
-            // 根据Sql类型选择链接数据库
-            in_array($this->options['type'], $this->power['write']) ? $this->connectWrite() : $this->connectRead();
-        } elseif ($type === 1) {
+        // 分离读写操作->只有存在读数据库才会执行读写分离
+        if (!in_array($this->options['type'], $this->power['write']) && isset(self::$do['read'])) {
             $this->connectRead();
-        } elseif ($type === 2) {
+        } else {
             $this->connectWrite();
         }
 
@@ -171,13 +163,19 @@ class Database
     /** 写数据库连接 */
     public function connectWrite()
     {
-        if (!self::$do[1]) {
+
+        if (!isset(self::$do['all']) && !isset(self::$do['write'])) {
             throw new Exception('error: database confg not find write power config,plase set read_write_power either 0 or 1 also add new config');
         }
 
         // 判断是否存在
         if (!isset($this->config['write'])) {
-            $this->config['write'] = self::$do[1][array_rand(self::$do[1])];
+            if (isset(self::$do['write'])) {
+                $this->config['write'] = self::$do['write'][array_rand(self::$do['write'])];
+            } else {
+                $this->config['write'] = self::$do['all'][array_rand(self::$do['all'])];
+            }
+
             // 判断是否存在PDO
             if (!isset($this->config['write']['pdo'])) {
                 $this->config['write']['pdo'] = $this->open($this->config['write']);
@@ -194,13 +192,19 @@ class Database
     /** 读数据库连接 */
     public function connectRead()
     {
-        if (!self::$do[1]) {
-            throw new Exception('error: database confg not find read power config,plase set read_write_power either 0 or 2 also add new config');
+
+        if (!isset(self::$do['all']) && !isset(self::$do['read'])) {
+            throw new Exception('error: database confg not find write power config,plase set read_write_power either 0 or 1 also add new config');
         }
 
         // 判断是否存在
         if (!isset($this->config['read'])) {
-            $this->config['read'] = self::$do[2][array_rand(self::$do[2])];
+            if (isset(self::$do['read'])) {
+                $this->config['read'] = self::$do['read'][array_rand(self::$do['read'])];
+            } else {
+                $this->config['read'] = self::$do['all'][array_rand(self::$do['all'])];
+            }
+
             // 判断是否存在PDO
             if (!isset($this->config['read']['pdo'])) {
                 $this->config['read']['pdo'] = $this->open($this->config['read']);
@@ -329,13 +333,13 @@ class Database
      * 查询条件
      * @date   2019-09-29T16:49:48+0800
      * @author ChenMingjiang
-     * @param  [type]                   $where   [description]
-     * @param  [type]                   $value   [description]
-     * @param  [type]                   $exp     [description]
+     * @param  [type]                   $where   [字段值 数组【 [field] => ['exp','value','maplink'] 】]
+     * @param  [type]                   $exp     [比较类型]
+     * @param  [type]                   $value   [值]
      * @param  string                   $mapLink [链接符 AND OR]
      * @return [type]                   [description]
      */
-    public function where($where, $value = null, $exp = null, $mapLink = 'AND')
+    public function where($where, $exp = null, $value = null, $mapLink = 'AND')
     {
 
         if (!$where) {
@@ -344,27 +348,25 @@ class Database
 
         // 存在三个参数 $exp => 参数值
         if ($value !== null && $exp !== null) {
-            $map[$where] = [$value, $exp];
+            $map[$where] = [$exp, $value, $mapLink];
             $where       = $map;
 
         }
         // 存在两个参数
-        elseif ($value !== null && $exp === null) {
+        elseif ($value === null && $exp !== null) {
             if (is_array($value)) {
                 throw new Exception("SQL Where 参数值错误 {$where} = `数组`");
             }
 
-            $map[$where] = $value;
+            $map[$where] = ['=', $exp, $mapLink];
             $where       = $map;
         }
 
         // 批量处理数组
         if (is_array($where)) {
             foreach ($where as $mapField => $v) {
-                // 初始化连接符
-                $mapLink = 'AND';
 
-                // 数组3个参数
+                // 数组2个参数
                 if (is_array($v) && count($v) == 2) {
                     list($mapExp, $mapValue) = $v;
                 }
@@ -573,7 +575,9 @@ class Database
 
         // '>', '<', '>=', '<=', '!=', 'like', '<>'
         if (in_array($mapExp, $expRule[0])) {
-            $map = $mapField . '  ' . $mapExp . ' \'' . $mapValue . '\'';
+            // 若field 为id强制转值为整型
+            $mapValue = $mapField == '`id`' ? ' ' . (int) $mapValue : ' \'' . $mapValue . '\'';
+            $map      = $mapField . '  ' . $mapExp . $mapValue;
         }
         // 'in', 'not in', 'IN', 'NOT IN'
         elseif (in_array($mapExp, $expRule[1])) {
@@ -583,11 +587,16 @@ class Database
                 if (!is_array($mapValue) && stripos($mapValue, ',') !== false) {
                     $mapValue = explode(',', $mapValue);
                 }
+
                 $mapValue      = is_array($mapValue) ? $mapValue : (array) $mapValue;
                 $commonInValue = '';
+
                 foreach ($mapValue as $inValue) {
-                    $commonInValue .= '\'' . $inValue . '\',';
+                    // 若field 为id强制转值为整型
+                    $inValue = $mapField == '`id`' ? ' ' . ((int) $inValue) . ',' : ' \'' . $inValue . '\',';
+                    $commonInValue .= $inValue;
                 }
+
                 $commonInValue = substr($commonInValue, 0, -1);
                 $map           = $mapField . '  ' . $mapExp . ' (' . $commonInValue . ')';
             }
@@ -625,7 +634,7 @@ class Database
 
             return [implode($mapLink, $mapArs), $mapLink];
         } else {
-            throw new Exception('SQL WHERE 参数错误 `' . $mapExp . '`');
+            throw new Exception('SQL WHERE 参数错误 mapExp:`' . $mapExp . '`');
         }
 
         $this->options['map'][] = [$map, $mapLink];
@@ -944,7 +953,7 @@ class Database
         $this->parseField();
 
         $where = ' WHERE table_name = \'' . $this->bulid['table'] . '\'';
-        if ($this->options['group']) {
+        if (isset($this->options['group']) && $this->options['group']) {
             $where .= $this->parseGroup();
         }
 
@@ -1214,22 +1223,21 @@ class Database
         }
 
         $_beginTime = microtime(true);
-        $result     = $this->link->query($this->bulid['sql']);
-        $_endTime   = microtime(true);
+        try {
+            $result = $this->link->query($this->bulid['sql']);
+        } catch (\Exception $e) {
+            throw new Exception($e->getMessage() . ' Sql:' . $this->bulid['sql']);
+        }
+        $_endTime = microtime(true);
 
         $this->sqlInfo['time'] = $_endTime - $_beginTime; // 获取执行时间
         $this->sqlInfo['sql']  = $this->bulid['sql']; // 执行Sql
 
-        // 日志记录埋点
-        // Log::info('SQL:' . $this->bulid['sql'] . ' [' . $this->sqlInfo['time'] . 's]');
         // 调试模式
-        // if (Config::get('trace')) {
         Trace::addSql($this->sqlInfo);
-        // }
 
         // 执行成功
         if ($result) {
-
             return $result;
         } else {
 
