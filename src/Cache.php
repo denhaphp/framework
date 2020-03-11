@@ -27,7 +27,7 @@ class Cache
     {
         if (!$config) {
             $config = Config::get('cache');
-            array_shift($config);
+            $config = array_shift($config);
         }
 
         return CacheFactory::message($config);
