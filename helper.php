@@ -1,5 +1,4 @@
- <?php
-
+<?php
 use denha\Cache;
 use denha\Config;
 use denha\Controller;
