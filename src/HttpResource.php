@@ -50,6 +50,13 @@ class HttpResource
         return false;
     }
 
+    public static function getHttpType()
+    {
+        $type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+
+        return $type;
+    }
+
     public static function getHost()
     {
         return isset($_SERVER['HTTP_HOST']) ? self::getHttpType() . $_SERVER['HTTP_HOST'] : '';
@@ -61,13 +68,6 @@ class HttpResource
         $url .= !empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '';
 
         return $url;
-    }
-
-    public static function getHttpType()
-    {
-        $type = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
-
-        return $type;
     }
 
     public static function getRequest()
@@ -327,7 +327,8 @@ class HttpResource
                 }
                 break;
             case 'json': // 解析json数据
-                $data = $data === '' ? $default : json_decode(str_replace('\"', '"', htmlspecialchars_decode($data)), true);
+                $data = str_replace('\"', '"', htmlspecialchars_decode($data));
+                $data = $default === true || $default === '' ? json_decode($data, true) : $data;
                 break;
             case 'implode': // 分割数组
                 $data = $data === '' ? '' : implode($default ? $default : ',', (array) $data);
