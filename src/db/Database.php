@@ -154,7 +154,7 @@ class Database
         }
 
         if (!$this->link->getAttribute(PDO::ATTR_SERVER_INFO)) {
-            throw new Exception('link infomation abnor');
+            throw new Exception('SQL Service Link Infomation Abnor');
         }
 
         return $this;
@@ -182,6 +182,11 @@ class Database
             }
         }
 
+        // 断线重连
+        if (!$this->config['write']['pdo']->getAttribute(PDO::ATTR_SERVER_INFO)) {
+            $this->config['write']['pdo'] = $this->open($this->config['write']);
+        }
+
         $this->link = $this->config['write']['pdo'];
 
         $this->options['tablepre'] = $this->config['write']['prefix'];
@@ -206,9 +211,14 @@ class Database
             }
 
             // 判断是否存在PDO
-            if (!isset($this->config['read']['pdo'])) {
+            if (!isset($this->config['read']['pdo']) || $this->config['read']['pdo']->getAttribute(PDO::ATTR_SERVER_INFO)) {
                 $this->config['read']['pdo'] = $this->open($this->config['read']);
             }
+        }
+
+        // 断线重连
+        if (!$this->config['read']['pdo']->getAttribute(PDO::ATTR_SERVER_INFO)) {
+            $this->config['read']['pdo'] = $this->open($this->config['read']);
         }
 
         $this->link = $this->config['read']['pdo'];
@@ -748,7 +758,7 @@ class Database
 
         foreach ($this->options['data'] as $k => $v) {
             $k = $this->addFieldTag($k);
-            if (is_array($v)) {
+            if (is_array($v) && isset($v[0])) {
 
                 $v[0] = strtolower($v[0]);
 
@@ -761,11 +771,12 @@ class Database
                 } elseif ($v[0] == 'json') {
                     $this->bulid['data'] .= $k . ' = \'' . json_encode($v[1], JSON_UNESCAPED_UNICODE) . '\',';
                 }
-            } else {
+            } elseif (is_string($v) || is_numeric($v)) {
                 $v = str_replace('\\', '\\\\', $v);
                 $v = str_replace('\'', '\\\'', $v);
-
                 $this->bulid['data'] .= $k . ' = \'' . $v . '\',';
+            } else {
+                throw new Exception('SQL ERROR ParseSetData: ' . json_encode($v));
             }
 
         }
