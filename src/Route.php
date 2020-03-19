@@ -157,6 +157,7 @@ class Route
         }
         // 改写信息
         else {
+            self::$regularUrl['changeUrl'][md5($changeUrl)]           = self::$id;
             self::$regularUrl['changeUrl'][md5($changeUrl . $params)] = self::$id;
         }
 
@@ -178,7 +179,7 @@ class Route
     {
 
         if (strpos($uri, '/s/') !== false) {
-            list($params, $changeUrl) = explode('/s/', $uri);
+            list($changeUrl, $params) = explode('/s/', $uri);
         } else {
             $params    = '';
             $changeUrl = $uri;
@@ -208,6 +209,9 @@ class Route
             $changeUrl = str_replace('.' . $suffix, '', $changeUrl);
         }
 
+        $params    = rtrim($params, '/');
+        $changeUrl = '/' . ltrim($changeUrl, '/') ?: '/';
+
         $cpmd5 = md5($changeUrl . $params); // 参数+地址匹配
         $cmd5  = md5($changeUrl); // 纯地址匹配
 
@@ -221,8 +225,8 @@ class Route
         }
 
         // 如果存在闭包信息则直接返回
-        if (isset(self::$regularUrl['closure'][$cpmd5]) || isset(self::$regularUrl['closure'][$cmd5])) {
-            $funs = self::$rule[self::$regularUrl['closure'][$cpmd5]]['change_url'] ?? self::$rule[self::$regularUrl['closure'][$cmd5]]['change_url'];
+        if (($isCpmd5 = isset(self::$regularUrl['closure'][$cpmd5])) || isset(self::$regularUrl['closure'][$cmd5])) {
+            $funs = $isCpmd5 === true ? self::$rule[self::$regularUrl['closure'][$cpmd5]]['change_url'] : self::$rule[self::$regularUrl['closure'][$cmd5]]['change_url'];
 
             if (is_callable($funs)) {
                 die(call_user_func($funs));
@@ -230,9 +234,10 @@ class Route
         }
 
         // 匹配changeUrl
-        if (isset(self::$regularUrl['changeUrl'][$cpmd5]) || isset(self::$regularUrl['closure'][$cmd5])) {
-            self::$thisRule['rule'] = self::$rule[self::$regularUrl['changeUrl'][$cpmd5]] ?? self::$rule[self::$regularUrl['changeUrl'][$cmd5]];
-            self::changeGetValue(self::$thisRule['rule']['params']); // 保存GET参数
+        if (($isCpmd5 = isset(self::$regularUrl['changeUrl'][$cpmd5])) || isset(self::$regularUrl['changeUrl'][$cmd5])) {
+            self::$thisRule['rule'] = $isCpmd5 === true ? self::$rule[self::$regularUrl['changeUrl'][$cpmd5]] : self::$rule[self::$regularUrl['changeUrl'][$cmd5]];
+
+            self::changeGetValue(self::$thisRule['rule']['params'], ['isGet' => true]); // 保存GET参数
 
             $url = self::$thisRule['rule']['url'] . ($params ? '/s/' . $params : '');
 
@@ -257,11 +262,13 @@ class Route
         $cpmd5 = md5($changeUrl . $params); // 参数+地址匹配
         $cmd5  = md5($changeUrl); // 纯地址匹配
 
-        if (isset(self::$regularUrl['url'][$cpmd5]) || isset(self::$regularUrl['url'][$cmd5])) {
-            self::$thisRule['rule'] = self::$rule[self::$regularUrl['url'][$cpmd5]] ?? self::$rule[self::$regularUrl['url'][$cmd5]];
+        if (($isCpmd5 = isset(self::$regularUrl['url'][$cpmd5])) || isset(self::$regularUrl['url'][$cmd5])) {
+            self::$thisRule['rule'] = $isCpmd5 === true ? self::$rule[self::$regularUrl['url'][$cpmd5]] : self::$rule[self::$regularUrl['url'][$cmd5]];
             self::changeGetValue(self::$thisRule['rule']['params']); // 保存GET信息
             // 过滤多余的“/” 存在参数则传参数 存在后缀则添加后缀
-            $url = '/' . ltrim((self::$thisRule['rule']['change_url'] . ($params ? '/s/' . $params : '') . self::$thisRule['rule']['suffix']), '/');
+
+            $urlParams = self::$thisRule['rule']['params'] === $params ? '' : $params;
+            $url       = '/' . ltrim((self::$thisRule['rule']['change_url'] . ($urlParams ? '/s/' . $urlParams : '') . self::$thisRule['rule']['suffix']), '/');
         }
 
         return $url ?? $uri;
