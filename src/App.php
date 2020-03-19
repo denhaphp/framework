@@ -14,6 +14,9 @@ use \ReflectionMethod;
 
 class App
 {
+
+    private $view; // 渲染内容
+
     public static $config           = [];
     public static $httpResource     = [];
     public static $methodDocComment = ''; // 当前运行方法注解
@@ -27,49 +30,64 @@ class App
      * @author ChenMingjiang
      * @param  string                   $configPath [配置文件地址]
      */
-    public function __construct($configPath = '')
+    public function start($configPath = '')
     {
         Exception::run(HttpResource::initInstance()); // 加载错误面板
 
-        self::$appPath = $this->getFramePath();
+        App::loadEnv(App::getFramePath());
 
-        $this->loadEnv();
-
-        $this->loadConfig($configPath);
+        App::loadConfig($configPath);
 
         if (!self::$config['debug']) {
             Exception::hide(HttpResource::initInstance(), self::$config); // 隐藏错误提示
         }
 
-        $this->loadHelper();
+        App::loadHelper();
+
+        return $this;
     }
 
     public function mark($class = '')
     {
         Route::make($class); // 解析路由
 
-        $view = $this->makeRouteRun();
-
-        // 视图渲染
-        if (is_array($view)) {
-            Controller::fetch(...$view);
-        } else {
-            echo $view;
-        }
+        $this->view = $this->makeRouteRun();
 
         $this->runLog(); // 日志记录
+
+        return $this;
+    }
+
+    /** 获取内容 */
+    public function getView()
+    {
+        return $this->view;
+    }
+
+    /** 执行输出 */
+    public function view()
+    {
+        // 视图渲染
+        if (is_array($this->view)) {
+            Controller::fetch(...$this->view);
+        } else {
+            echo $this->view;
+        }
     }
 
     /** 加载配置文件Env */
-    protected function loadEnv()
+    public static function loadEnv($appPath)
     {
-        if (is_file(self::$appPath . self::$build['env'])) {
-            include_once self::$appPath . self::$build['env'];
+
+        if (is_file($appPath . self::$build['env'])) {
+            include_once $appPath . self::$build['env'];
+        } else {
+            throw new Exception("Not Find env.php");
         }
     }
 
     /** [loadConfig description] */
-    protected function loadConfig($path)
+    public static function loadConfig($path = null)
     {
         // 获取配置文档信息
         if ($path) {
@@ -80,7 +98,7 @@ class App
     }
 
     /** 载入助手函数 */
-    protected function loadHelper()
+    public static function loadHelper()
     {
         foreach (self::$config['help_paths'] as $item) {
             if (!is_file($item)) {
@@ -91,9 +109,9 @@ class App
         }
     }
 
-    protected function getFramePath()
+    public static function getFramePath()
     {
-        return dirname(__DIR__) . DIRECTORY_SEPARATOR;
+        return self::$appPath = dirname(__DIR__) . DIRECTORY_SEPARATOR;
     }
 
     protected function runLog()

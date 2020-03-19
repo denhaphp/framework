@@ -108,7 +108,11 @@ class Trace
 
     public static function diskInfo()
     {
-        return number_format(disk_total_space(ROOT_PATH) / 1024 / 1024 / 1024, 3) . ' G (all) / ' . number_format((disk_total_space(ROOT_PATH) - disk_free_space(ROOT_PATH)) / 1024 / 1024 / 1024, 3) . ' G (use) / ' . number_format(disk_free_space(ROOT_PATH) / 1024 / 1024 / 1024, 3) . 'G (free)';
+        if (stripos(ini_get('disable_functions'), 'disk_total_space') === false) {
+            return number_format(disk_total_space(ROOT_PATH) / 1024 / 1024 / 1024, 3) . ' G (all) / ' . number_format((disk_total_space(ROOT_PATH) - disk_free_space(ROOT_PATH)) / 1024 / 1024 / 1024, 3) . ' G (use) / ' . number_format(disk_free_space(ROOT_PATH) / 1024 / 1024 / 1024, 3) . 'G (free)';
+        } else {
+            return '';
+        }
     }
 
     // 获取加载文件
