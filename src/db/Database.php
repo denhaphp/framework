@@ -771,12 +771,12 @@ class Database
                 } elseif ($v[0] == 'json') {
                     $this->bulid['data'] .= $k . ' = \'' . json_encode($v[1], JSON_UNESCAPED_UNICODE) . '\',';
                 }
-            } elseif (is_string($v) || is_numeric($v)) {
+            } elseif (is_string($v) || is_numeric($v) || $v === null) {
                 $v = str_replace('\\', '\\\\', $v);
                 $v = str_replace('\'', '\\\'', $v);
                 $this->bulid['data'] .= $k . ' = \'' . $v . '\',';
             } else {
-                throw new Exception('SQL ERROR ParseSetData: ' . json_encode($v));
+                throw new Exception('SQL ERROR ParseSetData: ' . json_decode($v));
             }
 
         }
