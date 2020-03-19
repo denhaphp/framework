@@ -22,12 +22,7 @@ class HttpResource
         }
 
         if (!self::$request) {
-            self::$request['service']         = $_SERVER;
-            self::$request['method']          = self::getMethod();
-            self::$request['params']['get']   = self::get();
-            self::$request['params']['post']  = self::post();
-            self::$request['params']['put']   = self::put();
-            self::$request['params']['files'] = self::files();
+            self::setRequest();
         }
     }
 
@@ -39,6 +34,16 @@ class HttpResource
         }
 
         return self::$instance;
+    }
+
+    public function setRequest()
+    {
+        self::$request['service']         = $_SERVER;
+        self::$request['method']          = self::getMethod();
+        self::$request['params']['get']   = self::get();
+        self::$request['params']['post']  = self::post();
+        self::$request['params']['put']   = self::put();
+        self::$request['params']['files'] = self::files();
     }
 
     public static function isAjax()
