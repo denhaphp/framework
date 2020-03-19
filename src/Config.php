@@ -83,7 +83,7 @@ class Config
 
                 if (!isset(self::$includes[$oneMd5])) {
                     if (is_file($onePath)) {
-                        self::$includes[$oneMd5] = include $onePath;
+                        self::$includes[$oneMd5] = include_once $onePath;
                     } else {
                         self::$includes[$oneMd5] = [];
                     }
