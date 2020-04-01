@@ -150,4 +150,46 @@ class Pages
             return $pages;
         }
     }
+
+    public function pc()
+    {
+        $this->pages();
+        if ($this->allPage > 1) {
+            if (stripos($this->pageUrl, '?') === false) {
+                $this->pageUrl = $this->pageUrl . '?pageNo=';
+            } else {
+                $this->pageUrl = $this->pageUrl . '&pageNo=';
+            }
+
+            $pages = '<ul class="pagination hidden-sm hidden-xs" >' . "\r\n";
+
+            $pages .= '<li><a href="' . $this->pageUrl . '1">首页</a></li>' . "\r\n";
+
+            if ($this->pageNo > $this->showPageFigure) {
+                $pages .= '<li><a href="' . $this->pageUrl . '1">«</a></li>' . "\r\n";
+            }
+
+            if ($this->pageNo > 1) {
+                $pages .= '<li><a href="' . $this->pageUrl . max(($this->pageNo - 1), 1) . '">‹</a></li>' . "\r\n";
+            }
+
+            if ($this->pageList) {
+                foreach ($this->pageList as $key => $value) {
+                    $value == $this->pageNo ? $class = 'class="active"' : $class = '';
+                    
+                    $pageUrl = $class != '' ? 'javascript:;' : $this->pageUrl . $value;
+
+                    $pages .= '<li ' . $class . '><a href="' . $pageUrl . '">' . $value . '</a></li>' . "\r\n";
+                }
+            }
+            $pages .= '<li><a href="' . $this->pageUrl . min(($this->pageNo + 1), $this->allPage) . '">›</a></li>' . "\r\n";
+            $pages .= '<li><a href="' . $this->pageUrl . $this->allPage . '">»</a></li>' . "\r\n";
+            $pages .= '</ul>' . "\r\n";
+            $pages .= '<span class="pagination-goto">' . "\r\n";
+            $pages .= '</span>' . "\r\n";
+            // $pages .= '</div>' . "\r\n";
+
+            return $pages;
+        }
+    }
 }
