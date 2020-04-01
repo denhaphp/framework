@@ -19,7 +19,7 @@ class Database
     private static $do; // 数据库操作符
 
     public $link; // 当前链接符
-    public $id; // 当前链接配置ID
+    public $id; // 当前链接配置信息
 
     public $options; // 记录参数信息$
     public $bulid; // 记录构造Sql;
@@ -189,6 +189,7 @@ class Database
         }
 
         $this->link = $this->config['write']['pdo'];
+        $this->id   = $this->config['write'];
 
         $this->options['tablepre'] = $this->config['write']['prefix'];
         $this->options['database'] = $this->config['write']['name'];
@@ -223,6 +224,7 @@ class Database
         }
 
         $this->link = $this->config['read']['pdo'];
+        $this->id   = $this->config['read'];
 
         $this->options['tablepre'] = $this->config['read']['prefix'];
         $this->options['database'] = $this->config['read']['name'];
@@ -647,12 +649,11 @@ class Database
             }
 
             return [implode($mapLink, $mapArs), $mapLink];
-        } 
+        }
         // 'locate', 'LOCATE'
         elseif (in_array($mapExp, $expRule[2])) {
             $map = $mapExp . '(\'' . $mapValue . '\',' . $mapField . ')';
-        }
-        else {
+        } else {
             throw new Exception('SQL WHERE 参数错误 mapExp:`' . $mapExp . '`');
         }
 
@@ -1284,7 +1285,7 @@ class Database
         $this->bulid['sql'] = $sql ? $sql : $this->bulid['sql'];
 
         // 存入Sql Explain信息
-        if (!empty($this->config['sql_explain'])) {
+        if (isset($this->id['sql_explain']) && $this->id['sql_explain']) {
             $res = $this->link->query('explain ' . $this->bulid['sql']);
             if ($res) {
                 $this->sqlInfo['explain'] = $res->fetchAll(PDO::FETCH_ASSOC);
