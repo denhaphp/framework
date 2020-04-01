@@ -330,22 +330,9 @@ if (!function_exists('getVar')) {
     }
 }
 
-if (!function_exists('getIP')) {
-    /**
-     * 获取真实IP地址
-     * @date   2018-07-12T17:13:17+0800
-     * @author ChenMingjiang
-     * @return [type]                   [description]
-     */
-    function getIP()
-    {
-        return Config::IP();
-    }
-}
-
 if (!function_exists('getConfig')) {
     /**
-     * 获取真实IP地址
+     * 获取配置文件
      * @date   2018-07-12T17:13:17+0800
      * @author ChenMingjiang
      * @return [type]                   [description]
@@ -544,10 +531,12 @@ if (!function_exists('response')) {
     function response($url, $method = 'GET', $param = [], $headers = [], $options = [])
     {
 
-        $isJson = isset($options['is_json']) ? $options['is_json'] : true;
-        $debug  = isset($options['debug']) ? $options['debug'] : false;
-        $ssl    = isset($options['ssl']) ? $options['ssl'] : [];
-        $isCode = isset($options['is_code']) ? $options['is_code'] : false;
+        $isJson  = isset($options['is_json']) ? $options['is_json'] : true;
+        $debug   = isset($options['debug']) ? $options['debug'] : false;
+        $ssl     = isset($options['ssl']) ? $options['ssl'] : [];
+        $isCode  = isset($options['is_code']) ? $options['is_code'] : false;
+        $outTime = isset($options['out_time']) ? $options['out_time'] : 10;
+        $code    = isset($options['code']) ? $options['code'] : false;
 
         $ch = curl_init(); // 初始化curl
 
@@ -609,7 +598,7 @@ if (!function_exists('response')) {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1); // 获取的信息以文件流的形式返回
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0); // 从证书中检查SSL加密算法是否存在
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0); // 对认证证书来源的检查
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10); // 请求超时时间
+        curl_setopt($ch, CURLOPT_TIMEOUT, $outTime); // 请求超时时间
         curl_setopt($ch, CURLOPT_URL, $url); // 要访问的地址
 
         $data = curl_exec($ch);
