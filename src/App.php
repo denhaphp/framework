@@ -121,7 +121,7 @@ class App
             'Method'      => HttpResource::getMethod(),
             'Crontroller' => HttpResource::getModuleName() . DS . HttpResource::getControllerName() . DS . HttpResource::getActionName(),
             'Sql'         => Trace::$sqlInfo,
-            'Ip'          => Config::IP(),
+            'Ip'          => HttpResources::ip(),
         ]);
 
         Log::call(); // 关闭日志
