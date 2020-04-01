@@ -123,7 +123,7 @@ class Controller
                         'files' => $_FILES,
                     ],
                     'docComment' => !App::$methodDocComment ?: explode(PHP_EOL, App::$methodDocComment),
-                    'ip'         => HttpResources::ip(),
+                    'ip'         => HttpResource::ip(),
                     'sql'        => Trace::$sqlInfo,
                 ],
             ];
