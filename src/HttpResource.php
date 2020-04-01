@@ -69,10 +69,7 @@ class HttpResource
 
     public static function getUrl()
     {
-        $url = isset($_SERVER['PHP_SELF']) ? self::getHost() . $_SERVER['PHP_SELF'] : '';
-        $url .= !empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '';
-
-        return $url;
+        return self::getHost() . self::getUri();
     }
 
     public static function getRequest()
@@ -105,7 +102,6 @@ class HttpResource
                     $data[$key] = $val;
                 }
             }
-
         } else {
             //数组信息通过 xx.xxx 来获取
             if (stripos($name, '.') !== false) {
@@ -179,7 +175,7 @@ class HttpResource
 
     public static function getModuleName()
     {
-        return self::$request['module'];
+        return self::$request['module'] ?? '';
     }
 
     public static function setController($name)
@@ -189,7 +185,7 @@ class HttpResource
 
     public static function getControllerName()
     {
-        return self::$request['controller'];
+        return self::$request['controller'] ?? '';
     }
 
     public static function setAction($name)
@@ -199,7 +195,27 @@ class HttpResource
 
     public static function getActionName()
     {
-        return self::$request['action'];
+        return self::$request['action'] ?? '';
+    }
+
+    public static function setUri($value)
+    {
+        self::$request['uri'] = $value;
+    }
+
+    public static function getUri()
+    {
+        return self::$request['uri'] ?? '';
+    }
+
+    public static function setClass($name)
+    {
+        self::$request['class'] = $name;
+    }
+
+    public static function getClass()
+    {
+        return self::$request['class'] ?? '';
     }
 
     /**
@@ -332,7 +348,7 @@ class HttpResource
                 }
                 break;
             case 'json': // 解析json数据
-                $data = str_replace('\"', '"', htmlspecialchars_decode($data));
+                $data = htmlspecialchars_decode(stripslashes($data));
                 $data = $default === true || $default === '' ? json_decode($data, true) : $data;
                 break;
             case 'implode': // 分割数组
@@ -354,12 +370,50 @@ class HttpResource
                     $data = implode(',', $data);
                 }
                 break;
+            case 'html_decode': // 字符串反解析
+                $data = htmlspecialchars_decode(stripslashes($data));
+                break;
             default:
                 # code...
                 break;
         }
 
         return $data;
+    }
+
+    /**
+     * 获取ip地址
+     * @date   2020-03-30T14:43:05+0800
+     * @author ChenMingjiang
+     * @param  boolean                  $isLong [是否返回整型 false:否 true:是 默认否]
+     */
+    public static function ip($isLong = false)
+    {
+        $ip = '0.0.0.1';
+
+        if (getenv('HTTP_CLIENT_IP')) {
+            $ip = getenv('HTTP_CLIENT_IP');
+        } elseif (getenv('HTTP_X_FORWARDED_FOR')) {
+            $ip = getenv('HTTP_X_FORWARDED_FOR');
+        } elseif (getenv('HTTP_X_FORWARDED')) {
+            $ip = getenv('HTTP_X_FORWARDED');
+        } elseif (getenv('HTTP_FORWARDED_FOR')) {
+            $ip = getenv('HTTP_FORWARDED_FOR');
+        } elseif (getenv('HTTP_FORWARDED')) {
+            $ip = getenv('HTTP_FORWARDED');
+        } elseif (isset($_SERVER['REMOTE_ADDR'])) {
+            $ip = $_SERVER['REMOTE_ADDR'];
+        }
+
+        // IP地址合法验证
+        $long = sprintf("%u", ip2long($ip));
+        $ip   = $long ? $ip : '0.0.0.1';
+
+        if ($isLong) {
+            return sprintf("%u", ip2long($ip));
+        }
+
+        return $ip;
     }
 
     /**
