@@ -5,6 +5,7 @@
 namespace denha\db;
 
 use denha;
+use denha\Cache;
 use denha\Config;
 use denha\Log;
 use denha\Trace;
@@ -249,6 +250,8 @@ class Database
             'order' => [],
             'limit' => [],
             'table' => [],
+            'cache' => [],
+            'map'   => [],
         ];
 
     }
@@ -581,6 +584,7 @@ class Database
             ['or', 'OR'],
             ['_string', '_STRING'],
             ['find_in_set', 'FIND_IN_SET'],
+            ['locate', 'LOCATE'],
         ];
 
         // '>', '<', '>=', '<=', '!=', 'like', '<>'
@@ -611,7 +615,7 @@ class Database
                 $map           = $mapField . '  ' . $mapExp . ' (' . $commonInValue . ')';
             }
         }
-        // 'instr', 'INSTR'
+        // 'instr', 'INSTR', 'not insrt', 'NOT INSTR'
         elseif (in_array($mapExp, $expRule[2])) {
             $map = $mapExp . '(' . $mapField . ',\'' . $mapValue . '\')';
         }
@@ -643,7 +647,12 @@ class Database
             }
 
             return [implode($mapLink, $mapArs), $mapLink];
-        } else {
+        } 
+        // 'locate', 'LOCATE'
+        elseif (in_array($mapExp, $expRule[2])) {
+            $map = $mapExp . '(\'' . $mapValue . '\',' . $mapField . ')';
+        }
+        else {
             throw new Exception('SQL WHERE 参数错误 mapExp:`' . $mapExp . '`');
         }
 
@@ -776,7 +785,7 @@ class Database
                 $v = str_replace('\'', '\\\'', $v);
                 $this->bulid['data'] .= $k . ' = \'' . $v . '\',';
             } else {
-                throw new Exception('SQL ERROR ParseSetData: ' . json_decode($v));
+                throw new Exception('SQL ERROR ParseSetData: ' . json_encode($v));
             }
 
         }
@@ -1211,6 +1220,50 @@ class Database
     }
 
     /**
+     * 数据库缓存
+     * @date   2020-03-31T09:15:55+0800
+     * @author ChenMingjiang
+     * @param  string                   $key [description]
+     * @param  integer                  $ttl [description]
+     * @return [type]                   [description]
+     */
+    public function cache($key = false, $ttl = 3600)
+    {
+        if ($key) {
+            $this->options['cache']['key'] = $key;
+        }
+
+        $this->options['cache']['ttl'] = $ttl;
+
+        return $this;
+    }
+
+    /** 获取数据缓存 */
+    public function getCache()
+    {
+        if (isset($this->options['cache']['key']) && $this->options['cache']['key'] === true && $this->options['map']) {
+            $this->options['cache']['key'] = md5(json_encode($this->options['map']));
+
+            if (Cache::has($this->options['cache']['key'])) {
+                return Cache::get($this->options['cache']['key']);
+            }
+        }
+
+        return false;
+    }
+
+    /** 数据结构缓存 */
+    public function setCache($result)
+    {
+        // 存在缓存key 并且是读操作
+        if (isset($this->options['cache']['key']) && $this->options['cache']['key'] && in_array($this->options['type'], $this->power['read'])) {
+            Cache::set($this->options['cache']['key'], $value, $this->options['cache']['ttl']);
+        }
+
+        return $result;
+    }
+
+    /**
      * 执行
      * @date   2017-03-19T16:20:36+0800
      * @author ChenMingjiang
@@ -1222,6 +1275,11 @@ class Database
 
         // 链接数据库
         $this->connect();
+
+        // 执行获取缓存数据
+        if ($result = $this->getCache()) {
+            return $result;
+        }
 
         $this->bulid['sql'] = $sql ? $sql : $this->bulid['sql'];
 
@@ -1249,7 +1307,7 @@ class Database
 
         // 执行成功
         if ($result) {
-            return $result;
+            return $this->setCache($result); // 缓存后返回信息
         } else {
 
             list($errorCode, $errorNumber, $errorMsg) = $this->link->errorInfo();
