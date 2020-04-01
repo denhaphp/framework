@@ -36,9 +36,10 @@ class Route
     {
         self::getConfig();
 
-        $uri = self::$thisRule['uri'] = self::$uri = $class ?: self::parseUri();
+        $uri = self::$thisRule['uri'] = self::$uri = self::parseUri($class);
 
         $params = '';
+
         if ($uri && strpos($uri, '/s/') !== false) {
             list($uri, $params) = explode('/s/', $uri);
         }
@@ -61,25 +62,30 @@ class Route
             return strtoupper($match[1]);
         }, implode(array_slice($route, -2, 1)))));
         HttpResource::setAction(end($route));
+        HttpResource::setClass(implode('\\', ['app', str_replace('.', '\\', HttpResource::getModuleName()), HttpResource::getControllerName()]));
 
-        return self::$class = implode('\\', ['app', str_replace('.', '\\', HttpResource::getModuleName()), HttpResource::getControllerName()]);
+        return HttpResource::getClass();
 
     }
 
     // 解析路由
-    private static function parseUri()
+    private static function parseUri($uri = null)
     {
 
-        if (isset($_SERVER['REQUEST_URI'])) {
-            $uri = $_SERVER['REQUEST_URI'];
-        } elseif (isset($_SERVER['argv'][1])) {
-            $uri = $_SERVER['argv'][1];
+        if (!$uri) {
+            if (isset($_SERVER['REQUEST_URI'])) {
+                $uri = $_SERVER['REQUEST_URI'];
+            } elseif (isset($_SERVER['argv'][1])) {
+                $uri = $_SERVER['argv'][1];
+            }
+
+            // 过滤SCRIPT_NAME
+            if (!empty($_SERVER['SCRIPT_NAME']) && strpos($uri, $_SERVER['SCRIPT_NAME']) === 0) {
+                $uri = substr($uri, strlen($_SERVER['SCRIPT_NAME']));
+            }
         }
 
-        // 过滤SCRIPT_NAME
-        if (!empty($_SERVER['SCRIPT_NAME']) && strpos($uri, $_SERVER['SCRIPT_NAME']) === 0) {
-            $uri = substr($uri, strlen($_SERVER['SCRIPT_NAME']));
-        }
+        HttpResource::setUri($uri); // 资源记录Uri信息
 
         // 删除参数
         if (($pos = strpos($uri, '?')) !== false) {
@@ -104,7 +110,12 @@ class Route
     {
         // 加载路由规则文件
         $routeFiles = (array) self::$config['route_files'];
+
         foreach ($routeFiles as $file) {
+            if (!is_file($file)) {
+                throw new Exception('Not Find Rout File :' . $file);
+            }
+
             include_once $file;
         }
     }
@@ -265,8 +276,8 @@ class Route
         if (($isCpmd5 = isset(self::$regularUrl['url'][$cpmd5])) || isset(self::$regularUrl['url'][$cmd5])) {
             self::$thisRule['rule'] = $isCpmd5 === true ? self::$rule[self::$regularUrl['url'][$cpmd5]] : self::$rule[self::$regularUrl['url'][$cmd5]];
             self::changeGetValue(self::$thisRule['rule']['params']); // 保存GET信息
-            // 过滤多余的“/” 存在参数则传参数 存在后缀则添加后缀
 
+            // 过滤多余的“/” 存在参数则传参数 存在后缀则添加后缀
             $urlParams = self::$thisRule['rule']['params'] === $params ? '' : $params;
             $url       = '/' . ltrim((self::$thisRule['rule']['change_url'] . ($urlParams ? '/s/' . $urlParams : '') . self::$thisRule['rule']['suffix']), '/');
         }
