@@ -133,7 +133,7 @@ class App
         // 日志记录
         $action = lcfirst(parsename(HttpResource::getActionName(), 1)); // 方法名称
 
-        $object = new ReflectionClass(Route::$class); // 获取类信息
+        $object = new ReflectionClass(HttpResource::getClass()); // 获取类信息
 
         $request = &HttpResource::$request;
         // 进入post提交方法
@@ -143,11 +143,11 @@ class App
             $methodAction = $action;
         }
 
-        $method = new ReflectionMethod(Route::$class, $methodAction); // 直接获取方法信息
+        $method = new ReflectionMethod(HttpResource::getClass(), $methodAction); // 直接获取方法信息
 
         // 只有公共方法可以调用
         if (!$method->isPublic()) {
-            throw new Exception(Route::$class . ' NOT PUBLIC [ ' . $methodAction . ' ] ACTION');
+            throw new Exception(HttpResource::getClass() . ' NOT PUBLIC [ ' . $methodAction . ' ] ACTION');
         }
 
         $params = [];
@@ -161,7 +161,7 @@ class App
 
         self::$methodDocComment = $method->getDocComment(); // 保存方法注解信息
 
-        return $method->invokeArgs(new Route::$class(), $params);
+        return $method->invokeArgs(new $request['class'](), $params);
     }
 
 }
