@@ -56,7 +56,10 @@ class Exception extends \Exception
         // 保存错误日志
         if (isset($config['error']['save_log']) && $config['error']['save_log']) {
             self::$whoops->pushHandler(function ($exception, $inspector, $run) {
-                Log::warning($exception->getMessage() . ' From: ' . $exception->getFile() . ' On Line: ' . $exception->getLine(), $exception->getTrace());
+                Log::warning($exception->getMessage() . ' From: ' . $exception->getFile() . ' On Line: ' . $exception->getLine(), [
+                    'trace' => $exception->getTrace(),
+                    'url'   => HttpResource::getUri(),
+                ]);
             });
         }
 
