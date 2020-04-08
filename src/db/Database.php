@@ -1171,7 +1171,12 @@ class Database
 
         $this->bulidSql('UPDATE');
         $result = $this->query();
-        $num    = $result->rowCount();
+
+        if (!$result) {
+            return false;
+        }
+
+        $num = $result->rowCount();
 
         return $num;
     }
@@ -1313,7 +1318,7 @@ class Database
 
             list($errorCode, $errorNumber, $errorMsg) = $this->link->errorInfo();
             // 存入文件
-            if (Config::get('debug') || $this->config['error_log']) {
+            if (Config::get('debug') || !empty($this->id['error_log'])) {
                 Log::error('SQL ERROR :' . $errorCode . ' ' . $errorMsg . ' SQL :  ' . $this->bulid['sql']);
             }
 
