@@ -9,6 +9,7 @@ namespace denha;
 
 use denha\App;
 use denha\Config;
+use denha\Db;
 
 class Trace
 {
@@ -88,7 +89,7 @@ class Trace
     private static function baseInfo()
     {
 
-        $dbConfig = Config::includes('db.php')['config'];
+        $dbConfig = Db::getConfigs();
         $dbName   = '';
         foreach ($dbConfig as $item) {
             !isset($item['host']) ?: $dbName .= $item['host'] . ' : ';

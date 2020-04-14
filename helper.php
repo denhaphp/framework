@@ -2,7 +2,7 @@
 use denha\Cache;
 use denha\Config;
 use denha\Controller;
-use denha\db\Database;
+use denha\Db;
 use denha\HttpResource;
 use denha\Route;
 
@@ -750,19 +750,13 @@ if (!function_exists('table')) {
      */
     function table($name = null, $options = [])
     {
-        static $_do;
-
-        if (is_null($_do)) {
-            $_do = Database::getInstance(); //单例实例化
-        }
 
         if ($name) {
-            $_do = $_do->table($name, $options);
+            return Db::table($name, $options);
         } else {
-            $_do = $_do;
+            return Db::connection();
         }
 
-        return $_do;
     }
 }
 
