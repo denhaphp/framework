@@ -242,6 +242,7 @@ abstract class Container
             'group'    => null,
             'table'    => null,
             'params'   => [],
+            'tmp'      => false,
         ];
 
         $this->options = [
@@ -253,6 +254,7 @@ abstract class Container
             'table' => [],
             'cache' => [],
             'map'   => [],
+            'tmp'   => false,
         ];
 
     }
@@ -288,6 +290,22 @@ abstract class Container
 
         $this->init();
         $this->options['table'] = ['name' => $table, 'is_prefix' => $isPrefix];
+
+        return $this;
+    }
+
+    /**
+     * 开启临时表
+     * @date   2020-04-14T12:00:34+0800
+     * @author ChenMingjiang
+     * @param  boolean                  $name [重命名表名称]
+     * @param  [type]                   $type [表存储类型]
+     * @return [type]                   [description]
+     */
+    public function tmp($name = true, $type = null)
+    {
+
+        $this->options['tmp'] = $name;
 
         return $this;
     }
@@ -1005,7 +1023,17 @@ abstract class Container
 
         switch ($type) {
             case 'SELECT':
+
                 $this->bulid['sql'] = 'SELECT ' . $this->bulid['field'] . ' FROM ' . $this->bulid['table'];
+
+                // 将查询结果存入临时表
+                if ($this->options['tmp']) {
+
+                    $name = $this->build['tmp'] !== true ? $this->options['tmp'] : $this->bulid['table'];
+
+                    
+                    $this->bulid['sql'] = 'DROP TEMPORARY TABLE IF EXISTS' . $this->build['tmp'] . '; CREATE TEMPORARY TABLE ' . $this->build['tmp'] . ' AS (' . $this->bulid['sql'] . ');';
+                }
                 break;
             case 'UPDATE':
                 $this->bulid['sql'] = 'UPDATE ' . $this->bulid['table'] . ' SET ' . implode(',', $this->parseSetData());
@@ -1524,7 +1552,7 @@ abstract class Container
                     $value = '\'' . $value . '\'';
                 }
 
-                $sql = str_replace($name, $value, $sql);
+                $sql = str_replace($name . ' ', $value . ' ', $sql);
             }
 
         }
