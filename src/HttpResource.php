@@ -12,14 +12,16 @@ class HttpResource
     public static $request; // 请求资源
     public static $instance; // 单例实例化;
 
-    private static $isXss = false;
+    // 参数过滤规则
+    const XSSARGS = [
+        'xss'   => '[\'\\\'\;\*\<\>].*\bon[a-zA-Z]{3,15}[\s\\r\\n\\v\\f]*\=|\b(?:expression)\(|\<script[\s\\\\\/]|\<\!\[cdata\[|\b(?:eval|alert|prompt|msgbox)\s*\(|url\((?:\#|data|javascript)',
+
+        'sql'   => '[^\{\s]{1}(\s|\b)+(?:select\b|update\b|insert(?:(\/\*.*?\*\/)|(\s)|(\+))+into\b).+?(?:from\b|set\b)|[^\{\s]{1}(\s|\b)+(?:create|delete|drop|truncate|rename|desc)(?:(\/\*.*?\*\/)|(\s)|(\+))+(?:table\b|from\b|database\b)|into(?:(\/\*.*?\*\/)|\s|\+)+(?:dump|out)file\b|\bsleep\([\s]*[\d]+[\s]*\)|benchmark\(([^\,]*)\,([^\,]*)\)|(?:declare|set|select)\b.*@|union\b.*(?:select|all)\b|(?:select|update|insert|create|delete|drop|grant|truncate|rename|exec|desc|from|table|database|set|where)\b.*(charset|ascii|bin|char|uncompress|concat|concat_ws|conv|export_set|hex|instr|left|load_file|locate|mid|sub|substring|oct|reverse|right|unhex)\(|(?:master\.\.sysdatabases|msysaccessobjects|msysqueries|sysmodules|mysql\.db|sys\.database_name|information_schema\.|sysobjects|sp_makewebtask|xp_cmdshell|sp_oamethod|sp_addextendedproc|sp_oacreate|xp_regread|sys\.dbms_export_extension)',
+
+        'other' => '\.\.[\\\\\/].*\%00([^0-9a-fA-F]|$)|%00[\'\\\'\.]'];
 
     public function __construct()
     {
-        if (!self::$isXss) {
-            self::filterXss(); // 执行Xss过滤
-            self::$isXss = true;
-        }
 
         if (!self::$request) {
             self::setRequest();
@@ -44,6 +46,8 @@ class HttpResource
         self::$request['params']['post']  = self::post();
         self::$request['params']['put']   = self::put();
         self::$request['params']['files'] = self::files();
+
+        self::xssRule($_COOKIE); // 过滤Cookie信息
     }
 
     public static function isAjax()
@@ -83,7 +87,7 @@ class HttpResource
         if (PHP_SAPI == 'cli') {
             $method = 'CLI';
         } else {
-            $method = $_SERVER['REQUEST_METHOD'];
+            $method = strtoupper($_SERVER['REQUEST_METHOD']);
         }
 
         return $method;
@@ -115,6 +119,8 @@ class HttpResource
         if ($name) {
             $data = self::filter($data, $type, $default);
         }
+
+        
         return $data;
     }
 
@@ -267,7 +273,9 @@ class HttpResource
     public static function filter($data, $types = 'intval', $default = '')
     {
         $types = explode('.', $types);
+
         foreach ($types as $type) {
+
             $data = self::parseFilter($data, $type, $default);
         }
 
@@ -416,53 +424,28 @@ class HttpResource
         return $ip;
     }
 
-    /**
-     * 过滤GET POST参数
-     * @date   2017-07-26T17:20:10+0800
-     * @author ChenMingjiang
-     * @return [type]                   [description]
-     */
-    public static function filterXss()
+    public static function xssRule($params)
     {
-        $urlArr  = ['xss' => '\=\+\/v(?:8|9|\+|\/)|\%0acontent\-(?:id|location|type|transfer\-encoding)'];
-        $argsArr = ['xss' => '[\'\\\'\;\*\<\>].*\bon[a-zA-Z]{3,15}[\s\\r\\n\\v\\f]*\=|\b(?:expression)\(|\<script[\s\\\\\/]|\<\!\[cdata\[|\b(?:eval|alert|prompt|msgbox)\s*\(|url\((?:\#|data|javascript)', 'sql' => '[^\{\s]{1}(\s|\b)+(?:select\b|update\b|insert(?:(\/\*.*?\*\/)|(\s)|(\+))+into\b).+?(?:from\b|set\b)|[^\{\s]{1}(\s|\b)+(?:create|delete|drop|truncate|rename|desc)(?:(\/\*.*?\*\/)|(\s)|(\+))+(?:table\b|from\b|database\b)|into(?:(\/\*.*?\*\/)|\s|\+)+(?:dump|out)file\b|\bsleep\([\s]*[\d]+[\s]*\)|benchmark\(([^\,]*)\,([^\,]*)\)|(?:declare|set|select)\b.*@|union\b.*(?:select|all)\b|(?:select|update|insert|create|delete|drop|grant|truncate|rename|exec|desc|from|table|database|set|where)\b.*(charset|ascii|bin|char|uncompress|concat|concat_ws|conv|export_set|hex|instr|left|load_file|locate|mid|sub|substring|oct|reverse|right|unhex)\(|(?:master\.\.sysdatabases|msysaccessobjects|msysqueries|sysmodules|mysql\.db|sys\.database_name|information_schema\.|sysobjects|sp_makewebtask|xp_cmdshell|sp_oamethod|sp_addextendedproc|sp_oacreate|xp_regread|sys\.dbms_export_extension)', 'other' => '\.\.[\\\\\/].*\%00([^0-9a-fA-F]|$)|%00[\'\\\'\.]'];
+        $args = self::XSSARGS;
 
-        $httpReferer = $_SERVER['HTTP_REFERER'] ?? [];
-        $queryString = $_SERVER['QUERY_STRING'] ?? [];
+        $filter = function ($params) use (&$filter, $args) {
+            foreach ($params as $key => $str) {
+                if (is_array($key)) {
+                    $filter($key);
+                } elseif (is_array($str)) {
+                    $filter($str);
+                } else {
+                    foreach ($args as $k => $item) {
+                        if ((preg_match('/' . $item . '/is', $str) == 1) || (preg_match('/' . $item . '/is', urlencode($str)) == 1)) {
+                            throw new Exception('you http params wrongful !!!');
+                        }
+                    }
+                }
+            }
+        };
 
-        self::GSF((array) $queryString, $urlArr);
-        self::GSF((array) $httpReferer, $argsArr);
-        self::GSF($_GET, $argsArr);
-        self::GSF($_POST, $argsArr);
-        self::GSF($_COOKIE, $argsArr);
+        $filter(is_array($params) ? $params : (array) $params);
 
     }
 
-    public static function GSF(array $array, $v)
-    {
-        foreach ($array as $key => $value) {
-            if (!is_array($key)) {
-                self::rules((string) $key, $v);
-            } else {
-                self::GSF($key, $v);
-            }
-
-            if (!is_array($value)) {
-                self::rules((string) $value, $v);
-            } else {
-                self::GSF($value, $v);
-            }
-        }
-    }
-
-    /** 正则过滤 */
-    public static function rules(string $str, $v)
-    {
-
-        foreach ($v as $key => $value) {
-            if ((preg_match('/' . $value . '/is', $str) == 1) || (preg_match('/' . $value . '/is', urlencode($str)) == 1)) {
-                throw new Exception('you http params wrongful !!!');
-            }
-        }
-    }
 }
