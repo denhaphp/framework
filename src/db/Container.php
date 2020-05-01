@@ -69,6 +69,16 @@ abstract class Container
         return $this->configs;
     }
 
+    public function getOptions()
+    {
+        return $this->options;
+    }
+
+    public function getBulid()
+    {
+        return $this->bulid;
+    }
+
     /** 数据库配置读取 */
     public function setConfig(array $config)
     {
@@ -204,8 +214,11 @@ abstract class Container
 
         // 判断是否存在
         if (!isset($this->config['read'])) {
-            if (isset(self::$do['read'])) {
-                $this->config['read'] = self::$do['read'][array_rand(self::$do['read'])];
+            if (isset(self::$do['read']) && isset(self::$do['all'])) {
+                $thisDo               = array_rand(['all' => 0, 'read' => 2]);
+                $this->config['read'] = self::$do[$thisDo][array_rand(self::$do[$thisDo])];
+            } elseif (isset(self::$do['read'])) {
+                $this->config['read'] = self::$do['all'][array_rand(self::$do['read'])];
             } else {
                 $this->config['read'] = self::$do['all'][array_rand(self::$do['all'])];
             }
@@ -682,14 +695,14 @@ abstract class Container
         $bankMapExp    = ' ' . trim($mapExp) . ' '; // 格式条件
         $mapLink       = ' ' . $mapLink . ' '; // 连接符
         $expRule       = [
-            ['>', '<', '>=', '<=', '!=', 'like', '<>', '='],
-            ['in', 'not in', 'IN', 'NOT IN'],
-            ['instr', 'INSTR', 'not insrt', 'NOT INSTR'],
-            ['between', 'BETWEEN'],
-            ['or', 'OR'],
-            ['_string', '_STRING'],
-            ['find_in_set', 'FIND_IN_SET'],
-            ['locate', 'LOCATE'],
+            ['>', '<', '>=', '<=', '!=', 'like', '<>', '='], // 0
+            ['in', 'not in', 'IN', 'NOT IN'],   // 1
+            ['instr', 'INSTR', 'not insrt', 'NOT INSTR'], // 2
+            ['between', 'BETWEEN'], // 3
+            ['or', 'OR'], // 4
+            ['_string', '_STRING'], // 5
+            ['find_in_set', 'FIND_IN_SET'], // 6
+            ['locate', 'LOCATE'], // 7
         ];
 
         // '>', '<', '>=', '<=', '!=', 'like', '<>'
@@ -752,6 +765,7 @@ abstract class Container
         // '_string', '_STRING'
         elseif (in_array($mapExp, $expRule[5])) {
             $map = $mapValue;
+            $this->options['map'][] = [$map, $mapLink];
             return [$map, $mapLink];
         }
         // 'find_in_set', 'FIND_IN_SET'
@@ -1031,7 +1045,6 @@ abstract class Container
 
                     $name = $this->build['tmp'] !== true ? $this->options['tmp'] : $this->bulid['table'];
 
-                    
                     $this->bulid['sql'] = 'DROP TEMPORARY TABLE IF EXISTS' . $this->build['tmp'] . '; CREATE TEMPORARY TABLE ' . $this->build['tmp'] . ' AS (' . $this->bulid['sql'] . ');';
                 }
                 break;
