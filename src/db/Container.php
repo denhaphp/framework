@@ -696,7 +696,7 @@ abstract class Container
         $mapLink       = ' ' . $mapLink . ' '; // 连接符
         $expRule       = [
             ['>', '<', '>=', '<=', '!=', 'like', '<>', '='], // 0
-            ['in', 'not in', 'IN', 'NOT IN'],   // 1
+            ['in', 'not in', 'IN', 'NOT IN'], // 1
             ['instr', 'INSTR', 'not insrt', 'NOT INSTR'], // 2
             ['between', 'BETWEEN'], // 3
             ['or', 'OR'], // 4
@@ -764,7 +764,7 @@ abstract class Container
         }
         // '_string', '_STRING'
         elseif (in_array($mapExp, $expRule[5])) {
-            $map = $mapValue;
+            $map                    = $mapValue;
             $this->options['map'][] = [$map, $mapLink];
             return [$map, $mapLink];
         }
@@ -1145,7 +1145,7 @@ abstract class Container
     public function value(string $field = '')
     {
         // 执行获取缓存数据
-        if ($result = $this->getCache(__FUNCTION__)) {
+        if (($result = $this->getCache(__FUNCTION__)) !== false) {
             return $result;
         }
 
@@ -1177,7 +1177,7 @@ abstract class Container
     public function column($field = '')
     {
         // 执行获取缓存数据
-        if ($result = $this->getCache(__FUNCTION__)) {
+        if (($result = $this->getCache(__FUNCTION__)) !== false) {
             return $result;
         }
 
@@ -1208,7 +1208,7 @@ abstract class Container
     public function find($field = '')
     {
         // 执行获取缓存数据
-        if ($result = $this->getCache(__FUNCTION__)) {
+        if (($result = $this->getCache(__FUNCTION__)) !== false) {
             return $result;
         }
 
@@ -1231,7 +1231,7 @@ abstract class Container
     public function lists($field = '*')
     {
         // 执行获取缓存数据
-        if ($result = $this->getCache(__FUNCTION__)) {
+        if (($result = $this->getCache(__FUNCTION__)) !== false) {
             return $result;
         }
 
@@ -1264,7 +1264,7 @@ abstract class Container
     {
 
         // 执行获取缓存数据
-        if ($result = $this->getCache(__FUNCTION__)) {
+        if (($result = $this->getCache(__FUNCTION__)) !== false) {
             return $result;
         }
 
@@ -1286,7 +1286,7 @@ abstract class Container
     public function count($value = null)
     {
         // 执行获取缓存数据
-        if ($result = $this->getCache(__FUNCTION__)) {
+        if (($result = $this->getCache(__FUNCTION__)) !== false) {
             return $result;
         }
 
@@ -1408,10 +1408,14 @@ abstract class Container
     public function cache($key = false, $ttl = 3600)
     {
         if ($key) {
-            $this->options['cache']['key'] = $key;
+            $this->options['cache']['key'] = (bool) $key;
         }
 
-        $this->options['cache']['ttl'] = $ttl;
+        if (is_numeric($key)) {
+            $this->options['cache']['ttl'] = $key;
+        } else {
+            $this->options['cache']['ttl'] = $ttl;
+        }
 
         return $this;
     }
@@ -1426,7 +1430,8 @@ abstract class Container
     public function getCache($prefix)
     {
         if (isset($this->options['cache']['key']) && $this->options['cache']['key'] === true && $this->options['map']) {
-            $this->options['cache']['key'] = $prefix . md5(json_encode($this->options['map']));
+
+            $this->options['cache']['key'] = $prefix . md5(json_encode($this->options['map']) . json_encode($this->bulid['params']));
 
             if (Cache::has($this->options['cache']['key'])) {
                 return Cache::get($this->options['cache']['key']);
