@@ -17,8 +17,31 @@ abstract class Container
 
     private static $do; // 数据库操作符
 
-    public $options; // 记录参数信息
-    public $bulid; // 记录构信息;
+    /** @var [type] [记录参数信息] */
+    public $options = [
+        'type'  => '',
+        'data'  => [],
+        'field' => [],
+        'order' => [],
+        'limit' => [],
+        'table' => [],
+        'cache' => [],
+        'map'   => [],
+        'tmp'   => false,
+    ]; 
+
+    /** @var [type] [记录构信息] */
+    public $bulid = [
+        'field'    => '*',
+        'sql'      => '',
+        'childSql' => false,
+        'data'     => [],
+        'order'    => null,
+        'group'    => null,
+        'table'    => null,
+        'params'   => [],
+        'tmp'      => false,
+    ];
 
     public $transactions = 0; // 事务计数器 处理事务嵌套问题
 
@@ -156,7 +179,7 @@ abstract class Container
     public function connect()
     {
         // 分离读写操作->只有存在读数据库才会执行读写分离
-        if (!in_array($this->options['type'], $this->power['write']) && isset(self::$do['read'])) {
+        if (in_array($this->options['type'], $this->power['read']) && isset(self::$do['read']) && $this->transactions == 0) {
             $this->connectRead();
         } else {
             $this->connectWrite();
@@ -922,6 +945,8 @@ abstract class Container
                     break;
                 case 'json':
                     $this->bulid['data'][$field] = $field . ' = ' . $buildField;
+
+                    $data = json_encode($data, JSON_UNESCAPED_UNICODE);
                     break;
                 case 'equal':
                     $this->bulid['data'][$field] = $field . ' = ' . $buildField;
@@ -999,12 +1024,7 @@ abstract class Container
      */
     public function getSql(bool $bool = true)
     {
-        $this->options['childSql'] = $bool;
-
-        if ($bool) {
-            $this->bulidSql('SELECT');
-            return $this->bulid['sql'];
-        }
+        $this->bulid['childSql'] = (bool) $bool;
 
         return $this;
     }
@@ -1468,6 +1488,10 @@ abstract class Container
     public function query($sql, array $params = [])
     {
 
+        if (isset($this->bulid['childSql']) && $this->bulid['childSql'] === true) {
+            return $this->getLastsql();
+        }
+
         // 链接数据库
         $this->connect();
 
@@ -1493,7 +1517,7 @@ abstract class Container
             $result = $this->PDOStatement->execute();
 
         } catch (\Exception $e) {
-            throw new Exception('line:' . $e->getLine() . ' error:' . $e->getMessage() . ' Sql:' . $this->getLastsql() . var_export($this->bulid['sql'], 1) . var_export($this->bulid['params'], 1));
+            throw new Exception('Line:' . $e->getLine() . ' Error:' . $e->getMessage() . ' Sql:' . $this->getLastsql() . ' Params :' . var_export($this->bulid['params'], 1));
         }
 
         $this->debug(false, $result);
@@ -1567,10 +1591,10 @@ abstract class Container
                 } elseif ($type == 'bool') {
                     $value = (bool) $value;
                 } else {
-                    $value = '\'' . $value . '\'';
+                    $value = var_export($value, 1);
                 }
 
-                $sql = str_replace($name . ' ', $value . ' ', $sql);
+                $sql = str_replace($name, $value, $sql);
             }
 
         }
