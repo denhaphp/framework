@@ -685,7 +685,9 @@ if (!function_exists('session')) {
 
         // 启动session
         if (PHP_SESSION_ACTIVE != session_status()) {
-            session_start();
+            session_start([
+                'cache_limiter' => 'nocache',
+            ]);
         }
 
         //删除
@@ -800,9 +802,9 @@ if (!function_exists('url')) {
         }
 
         if ($location === null || $location === '') {
-            $routeUrl = '/' . str_replace('.', '/', HttpResource::getModuleName()) . '/' . HttpResource::getControllerName() . '/' . HttpResource::getActionName();
+            $routeUrl = '/' . str_replace('.', '/', HttpResource::getModuleName()) . '/' . parseName(HttpResource::getControllerName()) . '/' .  parseName(HttpResource::getActionName());
         } elseif (stripos($location, '/') === false && $location != null) {
-            $routeUrl = '/' . str_replace('.', '/', HttpResource::getModuleName()) . '/' . HttpResource::getControllerName() . '/' . $location;
+            $routeUrl = '/' . str_replace('.', '/', HttpResource::getModuleName()) . '/' .  parseName(HttpResource::getControllerName()) . '/' . $location;
         } elseif (stripos($location, '/') !== false && stripos($location, '/') !== 0 && $location != null) {
             $routeUrl = '/' . str_replace('.', '/', HttpResource::getModuleName()) . '/' . $location;
         } elseif (stripos($location, '/') === 0) {
@@ -858,7 +860,7 @@ if (!function_exists('parseName')) {
      * @date   2018-07-12T17:02:36+0800
      * @author ChenMingjiang
      * @param  [type]                   $name [description]
-     * @param  boolean                  $type [description]
+     * @param  boolean                  $type [true :下划线转大写 false:大写转下划线]
      * @return [type]                         [description]
      */
     function parseName($name, $type = false)
