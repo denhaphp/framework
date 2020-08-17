@@ -131,6 +131,8 @@ class Route
      *                                             suffix 指定后缀名
      *                                             limit_suffix 限制后缀名
      *                                             hide_url true:隐藏原生url false:不隐藏
+     *                                             old_uri_hide true:禁止原路由地址访问 false:不禁止原路由访问
+     *                                             hiden_field String/Array:隐藏参数名称多个“,”分割/一位数组指定 false:不隐藏参数名称 默认不隐藏
      *                                             jump 自动跳转
      * @return [type]                              [description]
      */
@@ -145,6 +147,7 @@ class Route
         $suffix      = isset($options['suffix']) ? $options['suffix'] : '/';
         $limitSuffix = isset($options['limit_suffix']) ? explode(',', $options['limit_suffix']) : '';
         $oldUriHide  = isset($options['old_uri_hide']) ? $options['old_uri_hide'] : Config::get('route')['old_uri_hide'];
+        $hidenField  = isset($options['hiden_field']) ? $options['hiden_field'] : false;
         $jump        = isset($options['jump']) ? $options['jump'] : false;
 
         self::$rule[self::$id] = [
@@ -154,6 +157,7 @@ class Route
             'suffix'       => $suffix,
             'limit_suffix' => $limitSuffix,
             'old_uri_hide' => $oldUriHide,
+            'hiden_field'  => is_array($hidenField) ? $hidenField : ($hidenField ? (array) explode(',', $hidenField) : $hidenField),
             'jump'         => $jump,
         ];
 
@@ -168,8 +172,16 @@ class Route
         }
         // 改写信息
         else {
-            self::$regularUrl['changeUrl'][md5($changeUrl)]           = self::$id;
-            self::$regularUrl['changeUrl'][md5($changeUrl . $params)] = self::$id;
+            if (self::$rule[self::$id]['hiden_field']) {
+                $fields = '';
+                foreach (self::$rule[self::$id]['hiden_field'] as $field) {
+                    $fields .= '\/([a-zA-Z0-9]*)';
+                }
+                self::$regularUrl['changeUrlAll'][self::$id] = '/^\\' . $changeUrl . $fields . '/i';
+            } else {
+                self::$regularUrl['changeUrl'][md5($changeUrl)]           = self::$id;
+                self::$regularUrl['changeUrl'][md5($changeUrl . $params)] = self::$id;
+            }
         }
 
         // 原生信息
@@ -254,6 +266,25 @@ class Route
 
         }
 
+        // 匹配隐藏参数名称规则
+        if (isset(self::$regularUrl['changeUrlAll'])) {
+            foreach (self::$regularUrl['changeUrlAll'] as $id => $rule) {
+                if (preg_match($rule, $changeUrl, $matchs)) {
+                    self::$thisRule['rule'] = self::$rule[$id];
+
+                    foreach (self::$thisRule['rule']['hiden_field'] as $key => $field) {
+                        self::$thisRule['rule']['params'] .= $field . '/' . (isset($matchs[$key + 1]) ? $matchs[$key + 1] : '');
+                    }
+
+                    self::changeGetValue(self::$thisRule['rule']['params'], ['isGet' => true]); // 保存GET参数
+
+                    $url = self::$thisRule['rule']['url'] . ($params ? '/s/' . $params : '');
+
+                    break;
+                }
+            }
+        }
+
         return $url ?? $uri;
     }
 
@@ -279,7 +310,25 @@ class Route
 
             // 过滤多余的“/” 存在参数则传参数 存在后缀则添加后缀
             $urlParams = self::$thisRule['rule']['params'] === $params ? '' : $params;
-            $url       = '/' . ltrim((self::$thisRule['rule']['change_url'] . ($urlParams ? '/s/' . $urlParams : '') . self::$thisRule['rule']['suffix']), '/');
+
+            // 如果存在隐藏参数名称规则
+            if (self::$thisRule['rule']['hiden_field'] && $urlParams) {
+
+                $urlParams = explode('/', $urlParams);
+                foreach ($urlParams as $key => $field) {
+                    // 参数字段 存在隐藏
+                    if ($key % 2 == 0 && in_array($field, self::$thisRule['rule']['hiden_field'])) {
+                        unset($urlParams[$key]);
+                    }
+                }
+
+                $urlParams = '/' . implode('/', $urlParams);
+
+            } elseif ($urlParams) {
+                $urlParams = '/s/' . $urlParams;
+            }
+
+            $url = '/' . ltrim((self::$thisRule['rule']['change_url'] . $urlParams . self::$thisRule['rule']['suffix']), '/');
         }
 
         return $url ?? $uri;
