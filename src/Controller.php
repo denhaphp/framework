@@ -49,7 +49,8 @@ class Controller
         // 单个视图关闭调试模式
         $options['trace'] = isset($options['trace']) ? $options['trace'] : true;
 
-        $viewParamData = array_merge($viewParamData, self::$assign);
+        // view 覆盖 assign
+        $viewParamData = array_merge(self::$assign, $viewParamData);
 
         if (HttpResource::$request['params']['get']) {
             $viewParamData = array_merge($viewParamData, HttpResource::$request['params']['get']);
@@ -133,7 +134,7 @@ class Controller
         $value = array_merge($array, $value);
 
         // jsonpReturn返回
-        $callback = get('callbak', 'text', '');
+        $callback = get('callback', 'text', '');
         if ($callback && HttpResource::getMethod() === 'GET') {
             return $callback . '(' . json_encode($value) . ')';
         }

@@ -1026,6 +1026,11 @@ abstract class Container
     {
         $this->bulid['childSql'] = (bool) $bool;
 
+        if ($this->bulid['childSql'] === true) {
+            $this->bulidSql('SELECT');
+            return $this->getLastsql();
+        }
+
         return $this;
     }
 
@@ -1487,10 +1492,6 @@ abstract class Container
      */
     public function query($sql, array $params = [])
     {
-
-        if (isset($this->bulid['childSql']) && $this->bulid['childSql'] === true) {
-            return $this->getLastsql();
-        }
 
         // 链接数据库
         $this->connect();
