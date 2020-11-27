@@ -28,7 +28,7 @@ abstract class Container
         'cache' => [],
         'map'   => [],
         'tmp'   => false,
-    ]; 
+    ];
 
     /** @var [type] [记录构信息] */
     public $bulid = [
@@ -713,7 +713,7 @@ abstract class Container
     /** 处理查询条件 */
     public function parseMap($mapField, $mapExp, $mapValue, $mapLink = 'AND'): array
     {
-        $mapValueField = ':' . str_replace('.', '_', $mapField); // 预加载名称
+        $mapValueField = ':' . str_replace(['.', '`'], ['_', ''], $mapField); // 预加载名称
         $mapField      = $this->addFieldTag($mapField); // 格式化字段
         $bankMapExp    = ' ' . trim($mapExp) . ' '; // 格式条件
         $mapLink       = ' ' . $mapLink . ' '; // 连接符
