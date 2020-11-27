@@ -280,7 +280,7 @@ if (!function_exists('get')) {
      * @param  string                   $default [description]
      * @return [type]                            [description]
      */
-    function get($name, $type = '', $default = '')
+    function get($name = null, $type = '', $default = '')
     {
         if (isset(HttpResource::$request['params']['get'][$name])) {
             return HttpResource::filter(HttpResource::$request['params']['get'][$name], $type, $default);
@@ -522,10 +522,11 @@ if (!function_exists('response')) {
      * @param  array                    $param   [请求参数]
      * @param  array                    $headers [请求头部信息]
      * @param  array                    $options [配置项]
-     *                                           isJson：是否返回json数据 默认是
-     *                                           debug： 是否开启调试模式 默认否
-     *                                           ssl：证书认证地址
-     *                                           isCode:是否返回请求页面状态码
+     *                                           isJson(bool)：是否返回json数据 默认是
+     *                                           debug(bool)： 是否开启调试模式 默认否
+     *                                           ssl(array)：证书认证地址
+     *                                           is_code(bool):是否返回请求页面状态码
+     *                                           out_time(int):指定超时时间 默认10秒
      * @return [type]                   [description]
      */
     function response($url, $method = 'GET', $param = [], $headers = [], $options = [])
@@ -536,7 +537,6 @@ if (!function_exists('response')) {
         $ssl     = isset($options['ssl']) ? $options['ssl'] : [];
         $isCode  = isset($options['is_code']) ? $options['is_code'] : false;
         $outTime = isset($options['out_time']) ? $options['out_time'] : 10;
-        $code    = isset($options['code']) ? $options['code'] : false;
 
         $ch = curl_init(); // 初始化curl
 
@@ -625,9 +625,12 @@ if (!function_exists('response')) {
             print_r($code . PHP_EOL);
             print_r('-------END-----' . PHP_EOL);
             print_r('-------返回结果-----' . PHP_EOL);
-            print_r($data . PHP_EOL);
+            if ($code == 200) {
+                print_r($data . PHP_EOL);
+            } else {
+                print_r(curl_error($ch) . PHP_EOL);
+            }
             print_r('-------END-----' . PHP_EOL);
-            return;
         }
 
         if ('200' == $code) {
@@ -776,6 +779,9 @@ if (!function_exists('url')) {
      * @param  [type]                   $location [请求URL]
      * @param  array                    $params   [description]
      * @param  array                    $options  [description]
+     *                                            host 前缀域名
+     *                                            is_get 伪静态 true开启 false关闭
+     *                                            is_route 路由改写 true开启 false关闭
      * @return [type]                             [description]
      */
     function url($location = null, $params = [], $options = [])
@@ -783,6 +789,7 @@ if (!function_exists('url')) {
 
         $hostUrl = isset($options['host']) ? $options['host'] : HttpResource::getHost(); // 前缀域名
         $isGet   = isset($options['is_get']) ? $options['is_get'] : true; // 开启伪静态 true开启 false关闭
+        $isRoute = isset($options['is_route']) ? $options['is_route'] : true; // 开启路由改写 true开启 false关闭
 
         // 外链直接返回
         if (stripos($location, 'http://') !== false || stripos($location, 'https://') !== false) {
@@ -802,9 +809,9 @@ if (!function_exists('url')) {
         }
 
         if ($location === null || $location === '') {
-            $routeUrl = '/' . str_replace('.', '/', HttpResource::getModuleName()) . '/' . parseName(HttpResource::getControllerName()) . '/' .  parseName(HttpResource::getActionName());
+            $routeUrl = '/' . str_replace('.', '/', HttpResource::getModuleName()) . '/' . parseName(HttpResource::getControllerName()) . '/' . parseName(HttpResource::getActionName());
         } elseif (stripos($location, '/') === false && $location != null) {
-            $routeUrl = '/' . str_replace('.', '/', HttpResource::getModuleName()) . '/' .  parseName(HttpResource::getControllerName()) . '/' . $location;
+            $routeUrl = '/' . str_replace('.', '/', HttpResource::getModuleName()) . '/' . parseName(HttpResource::getControllerName()) . '/' . $location;
         } elseif (stripos($location, '/') !== false && stripos($location, '/') !== 0 && $location != null) {
             $routeUrl = '/' . str_replace('.', '/', HttpResource::getModuleName()) . '/' . $location;
         } elseif (stripos($location, '/') === 0) {
@@ -815,28 +822,43 @@ if (!function_exists('url')) {
 
         $param = '';
         if (!empty($params)) {
-            $isOne = true;
+
+            if (!$isGet) {
+                $explode = '&';
+                $param   = stripos($routeUrl, '?') === false ? '?' : '&';
+
+            } else {
+                $explode = '/';
+                $param   = stripos($routeUrl, '?') === false ? '/s/' : '/';
+            }
+
+            $firstKey = array_key_first($params);
             foreach ($params as $key => $value) {
-                if (!$isGet) {
-                    if ($isOne && stripos($routeUrl, '?') === false) {
-                        $param = '?' . $key . '=' . $value;
-                    } else {
-                        $param .= '&' . $key . '=' . $value;
+                if (is_array($value)) {
+                    $values  = '';
+                    $lastKey = key($value);
+                    foreach ($value as $field => $v) {
+                        if ($lastKey == $field) {
+                            $values .= $key . '[' . $field . ']' . $explode . $v;
+                        } else {
+                            $values .= $key . '[' . $field . ']' . $explode . $v . $explode;
+                        }
                     }
                 } else {
-                    if ($isOne && stripos($routeUrl, '?') === false) {
-                        $param .= '/s/' . $key . '/' . $value;
-                    } else {
-                        $param .= '/' . $key . '/' . $value;
-                    }
+                    $values = $key . $explode . $value;
                 }
 
-                $isOne = false;
+                if ($key == $firstKey) {
+                    $param .= $values;
+                } else {
+                    $param .= $explode . $values;
+                }
+
             }
         }
 
         // 检查规则路由
-        if (config('route.open_route')) {
+        if (config('route.open_route') && $isRoute) {
             $uri = Route::getRouteChangeUrl($routeUrl . $param);
         } else {
             $uri = $routeUrl . $param;
@@ -981,11 +1003,11 @@ if (!function_exists('isMobile')) {
             return true;
         }
         // 检查浏览器是否接受 WML.
-        elseif (strpos(strtoupper($_SERVER['HTTP_ACCEPT']), "VND.WAP.WML") > 0) {
+        elseif (isset($_SERVER['HTTP_ACCEPT']) && strpos(strtoupper($_SERVER['HTTP_ACCEPT']), "VND.WAP.WML") > 0) {
             return true;
         }
         //检查USER_AGENT
-        elseif (preg_match('/(blackberry|configuration\/cldc|hp |hp-|htc |htc_|htc-|iemobile|kindle|midp|mmp|motorola|mobile|nokia|opera mini|opera |Googlebot-Mobile|YahooSeeker\/M1A1-R2D2|android|iphone|ipod|mobi|palm|palmos|pocket|portalmmm|ppc;|smartphone|sonyericsson|sqh|spv|symbian|treo|up.browser|up.link|vodafone|windows ce|xda |xda_)/i', $_SERVER['HTTP_USER_AGENT'])) {
+        elseif (isset($_SERVER['HTTP_USER_AGENT']) && preg_match('/(blackberry|configuration\/cldc|hp |hp-|htc |htc_|htc-|iemobile|kindle|midp|mmp|motorola|mobile|nokia|opera mini|opera |Googlebot-Mobile|YahooSeeker\/M1A1-R2D2|android|iphone|ipod|mobi|palm|palmos|pocket|portalmmm|ppc;|smartphone|sonyericsson|sqh|spv|symbian|treo|up.browser|up.link|vodafone|windows ce|xda |xda_)/i', $_SERVER['HTTP_USER_AGENT'])) {
             return true;
         } else {
             return false;
