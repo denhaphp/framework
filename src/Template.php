@@ -28,13 +28,13 @@ class Template
 
     public static function config($config = [])
     {
-        self::$config['left']     = isset($config['left']) ? $config['left'] : '{';
-        self::$config['right']    = isset($config['right']) ? $config['right'] : '}';
-        self::$config['suffix']   = isset($config['suffix']) ? $config['suffix'] : '.html'; // 模板后缀名
-        self::$config['template'] = isset($config['template']) ? $config['template'] : 'Native'; // 模板渲染类名称
-        self::$config['root']     = isset($config['root']) ? $config['root'] : VIEW_PATH; // 模板根目录
-        self::$config['view']     = isset($config['view']) ? $config['view'] : ''; // 模板地址
-        self::$config['data']     = isset($config['data']) ? $config['data'] : []; // 模板渲染变量
+        self::$config['left']     = $config['left'] ?? '{';
+        self::$config['right']    = $config['right'] ?? '}';
+        self::$config['suffix']   = $config['suffix'] ?? '.html'; // 模板后缀名
+        self::$config['template'] = $config['template'] ?? 'Native'; // 模板渲染类名称
+        self::$config['root']     = $config['root'] ?? VIEW_PATH; // 模板根目录
+        self::$config['view']     = $config['view'] ?? ''; // 模板地址
+        self::$config['data']     = $config['data'] ?? []; // 模板渲染变量
 
     }
 
