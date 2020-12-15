@@ -31,7 +31,7 @@ abstract class Container
     ];
 
     /** @var [type] [记录构信息] */
-    public $bulid = [
+    public $build = [
         'field'    => '*',
         'sql'      => '',
         'childSql' => false,
@@ -54,17 +54,20 @@ abstract class Container
     private $configs; // 整个数据库配置信息
     private $config; // 当前使用的读写配置信息
     private $PDOStatement; // PDO执行实例
+    private $dbFileId; // 对应数据库文件信息
 
     public $link; // 当前链接符
     public $id; // 当前链接配置信息
 
     /** 字段类型 */
     const FIELD_PARAM = [
-        'bool' => PDO::PARAM_BOOL,
-        'null' => PDO::PARAM_NULL,
-        'int'  => PDO::PARAM_INT,
-        'str'  => PDO::PARAM_STR,
-        'lob'  => PDO::PARAM_LOB,
+        'bool'     => PDO::PARAM_BOOL, // 布尔数据类型
+        'null'     => PDO::PARAM_NULL, // NULL 数据类型
+        'int'      => PDO::PARAM_INT, // 整型
+        'str'      => PDO::PARAM_STR, // CHAR、VARCHAR 或其他字符串类型
+        'lob'      => PDO::PARAM_LOB, // 大对象数据类型
+        'str_natl' => PDO::PARAM_STR_NATL, // 是国家字符集
+        'str_char' => PDO::PARAM_STR_CHAR, // 常规字符集
     ];
 
     public function __construct(array $dbConfig = [])
@@ -84,12 +87,17 @@ abstract class Container
 
     public function getConfig()
     {
-        return $this->config;
+        return $this->config[$this->dbFileId] ?? [];
+    }
+
+    public function getDbFileId()
+    {
+        return $this->dbFileId;
     }
 
     public function getConfigs()
     {
-        return $this->configs;
+        return $this->configs[$this->dbFileId];
     }
 
     public function getOptions()
@@ -99,32 +107,42 @@ abstract class Container
 
     public function getBulid()
     {
-        return $this->bulid;
+        return $this->build;
     }
 
-    /** 数据库配置读取 */
-    public function setConfig(array $config)
+    /**
+     * 数据库配置读取
+     * @date   2020-12-04T11:51:25+0800
+     * @author ChenMingjiang
+     * @param  array                    $config  [配置信息]
+     * @param  string                   $fileMd5 [对应数据库文件md5]
+     */
+    public function setConfig(array $config, string $fileMd5)
     {
         $type = [0 => 'all', 1 => 'write', 2 => 'read'];
 
-        $power = $type[($config['read_write_power'] ?? 0)];
-        $hash  = md5(json_encode($config));
+        $powerType = $type[($config['read_write_power'] ?? 0)];
+        $hash      = md5(serialize($config));
 
         $config['dns'] = $this->parseDsn($config);
 
-        self::$do[$power][$hash] = $config;
+        self::$do[$fileMd5][$powerType][$hash] = $config;
 
         return $this;
     }
 
-    public function setConfigs(array $dbConfig = [])
+    public function setConfigs(array $dbConfig)
     {
-        if ($dbConfig) {
-            $this->configs = $dbConfig;
-        }
 
-        foreach ($this->configs as $item) {
-            $this->setConfig($item);
+        $this->dbFileId = md5(serialize($dbConfig));
+
+        if (!isset(self::$do[$this->dbFileId])) {
+
+            $this->configs[$this->dbFileId] = $dbConfig;
+
+            foreach ($this->configs[$this->dbFileId] as $item) {
+                $this->setConfig($item, $this->dbFileId);
+            }
         }
 
     }
@@ -133,8 +151,8 @@ abstract class Container
     public function open(array $config)
     {
 
-        $config['user'] = isset($config['user']) ? $config['user'] : '';
-        $config['pwd']  = isset($config['pwd']) ? $config['pwd'] : '';
+        $config['user'] = $config['user'] ?? '';
+        $config['pwd']  = $config['pwd'] ?? '';
 
         try {
             $do = new PDO($this->parseDsn($config), $config['user'], $config['pwd']);
@@ -161,7 +179,7 @@ abstract class Container
     public function getLastSql(): string
     {
 
-        return $this->getRealSql($this->bulid['sql'], $this->bulid['params']);
+        return $this->getRealSql($this->build['sql'], $this->build['params']);
     }
 
     /** 获取程序最后执行id */
@@ -195,73 +213,78 @@ abstract class Container
     /** 写数据库连接 */
     public function connectWrite()
     {
+        $configs = &self::$do[$this->dbFileId];
+        $config  = &$this->config[$this->dbFileId];
 
-        if (!isset(self::$do['all']) && !isset(self::$do['write'])) {
+        if (!isset($configs['all']) && !isset($configs['write'])) {
             throw new Exception('error: database confg not find write power config,plase set read_write_power either 0 or 1 also add new config');
         }
 
         // 判断是否存在
-        if (!isset($this->config['write'])) {
-            if (isset(self::$do['write'])) {
-                $this->config['write'] = self::$do['write'][array_rand(self::$do['write'])];
+        if (!isset($config['write'])) {
+            if (isset($config['write'])) {
+                $config['write'] = $configs['write'][array_rand($configs['write'])];
             } else {
-                $this->config['write'] = self::$do['all'][array_rand(self::$do['all'])];
+                $config['write'] = $configs['all'][array_rand($configs['all'])];
             }
 
             // 判断是否存在PDO
-            if (!isset($this->config['write']['pdo'])) {
-                $this->config['write']['pdo'] = $this->open($this->config['write']);
+            if (!isset($config['write']['pdo'])) {
+                $config['write']['pdo'] = $this->open($config['write']);
             }
         }
 
         // 断线重连
-        if (!$this->config['write']['pdo']->getAttribute(PDO::ATTR_SERVER_INFO)) {
-            $this->config['write']['pdo'] = $this->open($this->config['write']);
+        if (!$config['write']['pdo']->getAttribute(PDO::ATTR_SERVER_INFO)) {
+            $config['write']['pdo'] = $this->open($config['write']);
         }
 
-        $this->link = $this->config['write']['pdo'];
-        $this->id   = $this->config['write'];
+        $this->link = $config['write']['pdo'];
+        $this->id   = $config['write'];
 
-        $this->options['tablepre'] = $this->config['write']['prefix'];
-        $this->options['database'] = $this->config['write']['name'];
+        $this->options['tablepre'] = $config['write']['prefix'];
+        $this->options['database'] = $config['write']['name'];
 
     }
 
     /** 读数据库连接 */
-    public function connectRead()
+    public function connectRead($configs)
     {
 
-        if (!isset(self::$do['all']) && !isset(self::$do['read'])) {
+        $configs = &self::$do[$this->dbFileId];
+        $config  = &$this->config[$this->dbFileId];
+
+        if (!isset($configs['all']) && !isset($configs['read'])) {
             throw new Exception('error: database confg not find write power config,plase set read_write_power either 0 or 1 also add new config');
         }
 
         // 判断是否存在
-        if (!isset($this->config['read'])) {
-            if (isset(self::$do['read']) && isset(self::$do['all'])) {
-                $thisDo               = array_rand(['all' => 0, 'read' => 2]);
-                $this->config['read'] = self::$do[$thisDo][array_rand(self::$do[$thisDo])];
-            } elseif (isset(self::$do['read'])) {
-                $this->config['read'] = self::$do['all'][array_rand(self::$do['read'])];
+        if (!isset($config['read'])) {
+            if (isset($configs['read']) && isset($configs['all'])) {
+                $thisDo         = array_rand(['all' => 0, 'read' => 2]);
+                $config['read'] = $configs[$thisDo][array_rand($configs[$thisDo])];
+            } elseif (isset($configs['read'])) {
+                $config['read'] = $configs['all'][array_rand($configs['read'])];
             } else {
-                $this->config['read'] = self::$do['all'][array_rand(self::$do['all'])];
+                $config['read'] = $configs['all'][array_rand($configs['all'])];
             }
 
             // 判断是否存在PDO
-            if (!isset($this->config['read']['pdo']) || $this->config['read']['pdo']->getAttribute(PDO::ATTR_SERVER_INFO)) {
-                $this->config['read']['pdo'] = $this->open($this->config['read']);
+            if (!isset($config['read']['pdo']) || $config['read']['pdo']->getAttribute(PDO::ATTR_SERVER_INFO)) {
+                $config['read']['pdo'] = $this->open($config['read']);
             }
         }
 
         // 断线重连
-        if (!$this->config['read']['pdo']->getAttribute(PDO::ATTR_SERVER_INFO)) {
-            $this->config['read']['pdo'] = $this->open($this->config['read']);
+        if (!$config['read']['pdo']->getAttribute(PDO::ATTR_SERVER_INFO)) {
+            $config['read']['pdo'] = $this->open($config['read']);
         }
 
-        $this->link = $this->config['read']['pdo'];
-        $this->id   = $this->config['read'];
+        $this->link = $config['read']['pdo'];
+        $this->id   = $config['read'];
 
-        $this->options['tablepre'] = $this->config['read']['prefix'];
-        $this->options['database'] = $this->config['read']['name'];
+        $this->options['tablepre'] = $config['read']['prefix'];
+        $this->options['database'] = $config['read']['name'];
 
     }
 
@@ -269,7 +292,7 @@ abstract class Container
     public function init()
     {
 
-        $this->bulid = [
+        $this->build = [
             'field'    => '*',
             'sql'      => '',
             'childSql' => false,
@@ -304,7 +327,7 @@ abstract class Container
      */
     public function childSql(bool $bool = false)
     {
-        $this->bulid['childSql'] = $bool;
+        $this->build['childSql'] = $bool;
 
         return $this;
     }
@@ -316,7 +339,6 @@ abstract class Container
      * @param  [type]                   $table   [description]
      * @param  array                    $options [description]
      *                                  is_tablepre：是否使用表前缀
-     *                                  link：链接数据库配置ID
      * @return [type]                            [description]
      */
     public function table(string $table, array $options = [])
@@ -359,7 +381,7 @@ abstract class Container
         $this->connect();
         $this->parseTable();
 
-        return $this->bulid['table'];
+        return $this->build['table'];
     }
 
     /**
@@ -414,11 +436,11 @@ abstract class Container
             return true;
         }
 
-        if (!isset($this->bulid['params'][$this->addFieldTag($name)])) {
+        if (!isset($this->build['params'][$this->addFieldTag($name)])) {
             return false;
         }
 
-        $fields = &$this->bulid['params'][$this->addFieldTag($name)];
+        $fields = &$this->build['params'][$this->addFieldTag($name)];
 
         $i    = 0;
         $type = is_array($type) ? array_values($type) : (array) $type;
@@ -666,8 +688,8 @@ abstract class Container
 
         $name = $this->options['table']['is_prefix'] && $this->options['tablepre'] ? $this->options['tablepre'] . $name : $name;
 
-        if (empty($this->bulid['table'])) {
-            $this->bulid['table'] = $as ? $name . ' AS ' . $as : $name;
+        if (empty($this->build['table'])) {
+            $this->build['table'] = $as ? $name . ' AS ' . $as : $name;
         }
 
     }
@@ -706,14 +728,14 @@ abstract class Container
     public function setBuildParam($field, $name, $value, $type = 'str')
     {
 
-        $this->bulid['params'][$field][$name] = ['name' => $name, 'value' => $value, 'type' => $type];
+        $this->build['params'][$field][$name] = ['name' => $name, 'value' => $value, 'type' => $type];
 
     }
 
     /** 处理查询条件 */
     public function parseMap($mapField, $mapExp, $mapValue, $mapLink = 'AND'): array
     {
-        $mapValueField = ':' . str_replace(['.', '`'], ['_', ''], $mapField); // 预加载名称
+        $mapValueField = ':where_' . str_replace(['.', '`'], ['_', ''], $mapField); // 预加载名称
         $mapField      = $this->addFieldTag($mapField); // 格式化字段
         $bankMapExp    = ' ' . trim($mapExp) . ' '; // 格式条件
         $mapLink       = ' ' . $mapLink . ' '; // 连接符
@@ -867,18 +889,18 @@ abstract class Container
     {
         foreach ($this->options['join'] as $item) {
 
-            if ($this->bulid['table'] && empty($item['where'])) {
-                $item['where'] = $this->bulid['table'] . '.id = ' . $item['table'] . '.id';
+            if ($this->build['table'] && empty($item['where'])) {
+                $item['where'] = $this->build['table'] . '.id = ' . $item['table'] . '.id';
             }
 
-            if (!isset($this->bulid['join'])) {
-                $this->bulid['join'] = ' ' . $item['float'] . ' JOIN ' . $item['table'] . ' ON ' . $item['where'];
+            if (!isset($this->build['join'])) {
+                $this->build['join'] = ' ' . $item['float'] . ' JOIN ' . $item['table'] . ' ON ' . $item['where'];
             } else {
-                $this->bulid['join'] .= ' ' . $item['float'] . ' JOIN ' . $item['table'] . ' ON ' . $item['where'];
+                $this->build['join'] .= ' ' . $item['float'] . ' JOIN ' . $item['table'] . ' ON ' . $item['where'];
             }
         }
 
-        return $this->bulid['join'];
+        return $this->build['join'];
 
     }
 
@@ -886,29 +908,29 @@ abstract class Container
     public function parseLimit()
     {
 
-        $this->bulid['limit'] = ' LIMIT ' . $this->options['limit']['offset'];
+        $this->build['limit'] = ' LIMIT ' . $this->options['limit']['offset'];
         if ($this->options['limit']['pageSize']) {
-            $this->bulid['limit'] = ' LIMIT ' . $this->options['limit']['offset'] . ',' . $this->options['limit']['pageSize'];
+            $this->build['limit'] = ' LIMIT ' . $this->options['limit']['offset'] . ',' . $this->options['limit']['pageSize'];
         }
 
-        return $this->bulid['limit'];
+        return $this->build['limit'];
     }
 
     /** 解析field */
     public function parseField()
     {
         if (!$this->options['field']) {
-            $this->bulid['field'] = '*';
+            $this->build['field'] = '*';
         } else {
-            $this->bulid['field'] = '';
+            $this->build['field'] = '';
             foreach ($this->options['field'] as $val) {
-                $this->bulid['field'] .= $this->addFieldTag($val) . ',';
+                $this->build['field'] .= $this->addFieldTag($val) . ',';
             }
 
-            $this->bulid['field'] = substr($this->bulid['field'], 0, -1);
+            $this->build['field'] = substr($this->build['field'], 0, -1);
         }
 
-        return $this->bulid['field'];
+        return $this->build['field'];
     }
 
     /** 解析save */
@@ -930,29 +952,29 @@ abstract class Container
                 throw new Exception('SQL ERROR ParseSetData:' . var_export($this->options['data'], 1));
             }
 
-            $buildField = ':' . str_replace('.', '_', $field); // 预加载名称
+            $buildField = ':save_' . str_replace('.', '_', $field); // 预加载名称
             $field      = $this->addFieldTag($field);
 
             switch ($exp) {
                 case 'add':
-                    $this->bulid['data'][$field] = $field . ' = ' . $field . ' + ' . $buildField;
+                    $this->build['data'][$field] = $field . ' = ' . $field . ' + ' . $buildField;
                     break;
                 case 'less':
-                    $this->bulid['data'][$field] = $field . ' = ' . $field . ' -' . $buildField;
+                    $this->build['data'][$field] = $field . ' = ' . $field . ' -' . $buildField;
                     break;
                 case 'concat':
-                    $this->bulid['data'][$field] = $field . ' = CONCAT(' . $field . ',' . $buildField . ')';
+                    $this->build['data'][$field] = $field . ' = CONCAT(' . $field . ',' . $buildField . ')';
                     break;
                 case 'json':
-                    $this->bulid['data'][$field] = $field . ' = ' . $buildField;
+                    $this->build['data'][$field] = $field . ' = ' . $buildField;
 
                     $data = json_encode($data, JSON_UNESCAPED_UNICODE);
                     break;
                 case 'equal':
-                    $this->bulid['data'][$field] = $field . ' = ' . $buildField;
+                    $this->build['data'][$field] = $field . ' = ' . $buildField;
                     break;
                 case 'string':
-                    $this->bulid['data'][$field] = $value;
+                    $this->build['data'][$field] = $value;
                     break;
                 default:
                     throw new Exception('SQL ERROR ParseSetData: [ ' . $exp . ' ] [' . $value . ']');
@@ -965,22 +987,22 @@ abstract class Container
 
         }
 
-        return $this->bulid['data'];
+        return $this->build['data'];
     }
 
     public function parseGroup()
     {
         foreach ($this->options['group'] as $val) {
-            $this->bulid['group'] .= $this->addFieldTag($val) . ',';
+            $this->build['group'] .= $this->addFieldTag($val) . ',';
         }
 
-        if (!$this->bulid['order']) {
-            $this->bulid['group'] = ' GROUP BY ' . substr($this->bulid['group'], 0, -1);
+        if (!$this->build['order']) {
+            $this->build['group'] = ' GROUP BY ' . substr($this->build['group'], 0, -1);
         } else {
-            $this->bulid['group'] = ' , ' . substr($this->bulid['group'], 0, -1);
+            $this->build['group'] = ' , ' . substr($this->build['group'], 0, -1);
         }
 
-        return $this->bulid['group'];
+        return $this->build['group'];
     }
 
     public function parseOrder()
@@ -998,21 +1020,21 @@ abstract class Container
                 }
             }
 
-            if (!$this->bulid['order']) {
-                $this->bulid['order'] = ' ORDER BY ' . implode(',', $orders);
+            if (!$this->build['order']) {
+                $this->build['order'] = ' ORDER BY ' . implode(',', $orders);
             } else {
-                $this->bulid['order'] .= ' , ' . implode(',', $orders);
+                $this->build['order'] .= ' , ' . implode(',', $orders);
             }
         }
 
-        return $this->bulid['order'];
+        return $this->build['order'];
     }
 
     public function parseHaving()
     {
-        $this->bulid['having'] = ' HAVING ' . $this->addFieldTag($this->options['having']);
+        $this->build['having'] = ' HAVING ' . $this->addFieldTag($this->options['having']);
 
-        return $this->bulid['order'];
+        return $this->build['order'];
     }
 
     /**
@@ -1024,10 +1046,10 @@ abstract class Container
      */
     public function getSql(bool $bool = true)
     {
-        $this->bulid['childSql'] = (bool) $bool;
+        $this->build['childSql'] = (bool) $bool;
 
-        if ($this->bulid['childSql'] === true) {
-            $this->bulidSql('SELECT');
+        if ($this->build['childSql'] === true) {
+            $this->buildSql('SELECT');
             return $this->getLastsql();
         }
 
@@ -1043,13 +1065,13 @@ abstract class Container
      */
     public function childSqlQuery(string $table)
     {
-        $this->bulid['table'] = '(' . $table . ') as child';
+        $this->build['table'] = '(' . $table . ') as child';
 
         return $this;
     }
 
     /** 构建SQL语句 */
-    public function bulidSql(string $type = 'SELECT')
+    public function buildSql(string $type = 'SELECT')
     {
 
         $this->options['type'] = $type;
@@ -1063,21 +1085,21 @@ abstract class Container
         switch ($type) {
             case 'SELECT':
 
-                $this->bulid['sql'] = 'SELECT ' . $this->bulid['field'] . ' FROM ' . $this->bulid['table'];
+                $this->build['sql'] = 'SELECT ' . $this->build['field'] . ' FROM ' . $this->build['table'];
 
                 // 将查询结果存入临时表
                 if ($this->options['tmp']) {
 
-                    $name = $this->build['tmp'] !== true ? $this->options['tmp'] : $this->bulid['table'];
+                    $name = $this->build['tmp'] !== true ? $this->options['tmp'] : $this->build['table'];
 
-                    $this->bulid['sql'] = 'DROP TEMPORARY TABLE IF EXISTS' . $this->build['tmp'] . '; CREATE TEMPORARY TABLE ' . $this->build['tmp'] . ' AS (' . $this->bulid['sql'] . ');';
+                    $this->build['sql'] = 'DROP TEMPORARY TABLE IF EXISTS' . $this->build['tmp'] . '; CREATE TEMPORARY TABLE ' . $this->build['tmp'] . ' AS (' . $this->build['sql'] . ');';
                 }
                 break;
             case 'UPDATE':
-                $this->bulid['sql'] = 'UPDATE ' . $this->bulid['table'] . ' SET ' . implode(',', $this->parseSetData());
+                $this->build['sql'] = 'UPDATE ' . $this->build['table'] . ' SET ' . implode(',', $this->parseSetData());
                 break;
             case 'INSERT':
-                $this->bulid['sql'] = 'INSERT INTO ' . $this->bulid['table'];
+                $this->build['sql'] = 'INSERT INTO ' . $this->build['table'];
 
                 $names  = [];
                 $values = [];
@@ -1090,14 +1112,14 @@ abstract class Container
                     }
                 }
 
-                $this->bulid['sql'] = 'INSERT INTO ' . $this->bulid['table'] . '(' . implode(',', $names) . ')VALUE(' . implode(',', $values) . ')';
+                $this->build['sql'] = 'INSERT INTO ' . $this->build['table'] . '(' . implode(',', $names) . ')VALUE(' . implode(',', $values) . ')';
 
                 break;
             case 'DELETE':
-                $this->bulid['sql'] = 'DELETE FROM ' . $this->bulid['table'];
+                $this->build['sql'] = 'DELETE FROM ' . $this->build['table'];
                 break;
             case 'COUNT':
-                $this->bulid['sql'] = 'SELECT  COUNT(' . $this->bulid['field'] . ') AS  t  FROM ' . $this->bulid['table'];
+                $this->build['sql'] = 'SELECT  COUNT(' . $this->build['field'] . ') AS  t  FROM ' . $this->build['table'];
                 break;
             default:
                 # code...
@@ -1105,30 +1127,30 @@ abstract class Container
         }
 
         if (isset($this->options['join']) && !empty($this->options['join'])) {
-            $this->bulid['sql'] .= $this->parseJoin();
+            $this->build['sql'] .= $this->parseJoin();
         }
 
         if (isset($this->options['map']) && !empty($this->options['map'])) {
-            $this->bulid['sql'] .= $this->parseWhere();
+            $this->build['sql'] .= $this->parseWhere();
         }
 
         if (isset($this->options['group']) && !empty($this->options['group'])) {
-            $this->bulid['sql'] .= $this->parseGroup();
+            $this->build['sql'] .= $this->parseGroup();
         }
 
         if (isset($this->options['having']) && !empty($this->options['having'])) {
-            $this->bulid['sql'] .= $this->parseHaving();
+            $this->build['sql'] .= $this->parseHaving();
         }
 
         if (isset($this->options['order']) && !empty($this->options['order'])) {
-            $this->bulid['sql'] .= $this->parseOrder();
+            $this->build['sql'] .= $this->parseOrder();
         }
 
         if (isset($this->options['limit']) && !empty($this->options['limit'])) {
-            $this->bulid['sql'] .= $this->parseLimit();
+            $this->build['sql'] .= $this->parseLimit();
         }
 
-        return $this->bulid['sql'];
+        return $this->build['sql'];
     }
 
     /** 查询数据表信息 */
@@ -1141,8 +1163,8 @@ abstract class Container
         $this->field($field);
         $this->parseField();
 
-        $this->bulid['sql'] = 'SHOW TABLE STATUS WHERE NAME = \'' . $this->bulid['table'] . '\'';
-        $result             = $this->query($this->bulid['sql']);
+        $this->build['sql'] = 'SHOW TABLE STATUS WHERE NAME = \'' . $this->build['table'] . '\'';
+        $result             = $this->query($this->build['sql']);
         $lists              = $result->fetch(PDO::FETCH_ASSOC);
 
         if (count($this->options['field']) == 1 && $lists) {
@@ -1180,7 +1202,7 @@ abstract class Container
 
         $this->limit(1);
 
-        $result = $this->query($this->bulidSql('SELECT'), $this->bulid['params']);
+        $result = $this->query($this->buildSql('SELECT'), $this->build['params']);
 
         if ($result) {
             $data = $result->fetchColumn();
@@ -1192,14 +1214,16 @@ abstract class Container
     }
 
     /**
-     * 获取单个字段列表
-     * 如果field是两个字段 则首字段为value 尾字段为key
+     * 获取字段列表
+     * 如果field是单个字段 则返回一位数组
+     * 如果field是两个字段 则第一个字段为value 第二个字段为key
+     * 如果field是两个字段以上 最后一个字段作为key 所有字段作为key的一维数组
      * @date   2018-07-12T14:41:02+0800
      * @author ChenMingjiang
      * @param  [type]                   $field [description]
      * @return [type]                          [description]
      */
-    public function column($field = '')
+    public function column(string $field)
     {
         // 执行获取缓存数据
         if (($result = $this->getCache(__FUNCTION__)) !== false) {
@@ -1210,13 +1234,16 @@ abstract class Container
             $this->field($field);
         }
 
-        $result = $this->query($this->bulidSql('SELECT'), $this->bulid['params']);
+        $result = $this->query($this->buildSql('SELECT'), $this->build['params']);
 
-        while ($row = $result->fetch(PDO::FETCH_NUM)) {
-            if (count($this->options['field']) == 2) {
-                $data[$row[1]] = $row[0];
+        while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
+
+            if (count($this->options['field']) == 2 && !in_array('*', $this->options['field'])) {
+                $data[$row[$this->options['field'][0]]] = $row[$this->options['field'][1]];
+            } elseif (count($this->options['field']) >= 2) {
+                $data[$row[end($this->options['field'])]] = $row;
             } else {
-                $data[] = $row[0];
+                $data[] = $row[$this->options['field'][0]];
             }
         }
 
@@ -1243,7 +1270,7 @@ abstract class Container
 
         $this->limit(1);
 
-        $result = $this->query($this->bulidSql('SELECT'), $this->bulid['params']);
+        $result = $this->query($this->buildSql('SELECT'), $this->build['params']);
 
         $data = $result->fetch(PDO::FETCH_ASSOC);
 
@@ -1266,7 +1293,7 @@ abstract class Container
 
         $this->limit(1);
 
-        $result = $this->query($this->bulidSql('SELECT'), $this->bulid['params']);
+        $result = $this->query($this->buildSql('SELECT'), $this->build['params']);
 
         $data = $result->fetch(PDO::FETCH_NUM);
         if ($data == false) {
@@ -1293,7 +1320,7 @@ abstract class Container
             return $result;
         }
 
-        $result = $this->query($this->bulidSql('SELECT'), $this->bulid['params']);
+        $result = $this->query($this->buildSql('SELECT'), $this->build['params']);
 
         $data = $result->fetchAll(PDO::FETCH_ASSOC);
 
@@ -1319,7 +1346,7 @@ abstract class Container
             $this->field($value);
         }
 
-        $result = $this->query($this->bulidSql('COUNT'), $this->bulid['params']);
+        $result = $this->query($this->buildSql('COUNT'), $this->build['params']);
         $data   = $result->fetchColumn();
 
         // 如果开启缓存则保存缓存
@@ -1333,7 +1360,7 @@ abstract class Container
 
         $this->setData($data, $exp, $value);
 
-        $result = $this->query($this->bulidSql('INSERT'), $this->bulid['params']);
+        $result = $this->query($this->buildSql('INSERT'), $this->build['params']);
 
         return $result === false ? false : $this->getLastInsertId();
     }
@@ -1358,7 +1385,7 @@ abstract class Container
     {
         $this->setData($data, $exp, $value);
 
-        $result = $this->query($this->bulidSql('UPDATE'), $this->bulid['params']);
+        $result = $this->query($this->buildSql('UPDATE'), $this->build['params']);
 
         if (!$result) {
             return false;
@@ -1377,7 +1404,7 @@ abstract class Container
             throw new Exception('SQL ERROR : 禁止全表删除');
         }
 
-        $result = $this->query($this->bulidSql('DELETE'), $this->bulid['params']);
+        $result = $this->query($this->buildSql('DELETE'), $this->build['params']);
         $num    = $result->rowCount();
 
         return $num;
@@ -1456,7 +1483,7 @@ abstract class Container
     {
         if (isset($this->options['cache']['key']) && $this->options['cache']['key'] === true && $this->options['map']) {
 
-            $this->options['cache']['key'] = $prefix . md5(json_encode($this->options['map']) . json_encode($this->bulid['params']));
+            $this->options['cache']['key'] = $prefix . md5(json_encode($this->options['map']) . json_encode($this->build['params']));
 
             if (Cache::has($this->options['cache']['key'])) {
                 return Cache::get($this->options['cache']['key']);
@@ -1507,9 +1534,13 @@ abstract class Container
 
             // 绑定预加载参数
             if ($params) {
-                foreach ($params as $bulids) {
-                    foreach ($bulids as $item) {
+
+                foreach ($params as $builds) {
+
+                    foreach ($builds as $item) {
+
                         $this->buildParam($item);
+
                     }
                 }
             }
@@ -1518,7 +1549,7 @@ abstract class Container
             $result = $this->PDOStatement->execute();
 
         } catch (\Exception $e) {
-            throw new Exception('Line:' . $e->getLine() . ' Error:' . $e->getMessage() . ' Sql:' . $this->getLastsql() . ' Params :' . var_export($this->bulid['params'], 1));
+            throw new Exception('Line:' . $e->getLine() . ' Error:' . $e->getMessage() . ' Sql:' . $this->getLastsql() . ' Params :' . var_export($this->build['params'], 1));
         }
 
         $this->debug(false, $result);
@@ -1585,6 +1616,7 @@ abstract class Container
         foreach ($binds as $bind) {
 
             foreach ($bind as $item) {
+
                 list($name, $value, $type) = array_values($item);
 
                 if ($type == 'int') {
@@ -1596,6 +1628,7 @@ abstract class Container
                 }
 
                 $sql = str_replace($name, $value, $sql);
+
             }
 
         }
