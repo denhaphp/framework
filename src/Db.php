@@ -13,17 +13,25 @@ class Db
         'sqlite' => \denha\db\handler\Sqlite::class,
     ];
 
-    public static function connection($type = 'mysql', array $config = [])
+    /**
+     * 指定链接数据库
+     * @date   2020-12-04T14:42:02+0800
+     * @author ChenMingjiang
+     * @param  string                   $handlerType [驱动类型]
+     * @param  array                    $config      [description]
+     * @return [type]                   [description]
+     */
+    public static function connection($handlerType = 'mysql', array $config = [])
     {
-        $type = strtolower($type);
+        $type = strtolower($handlerType);
 
         if (isset(self::$handler[$type])) {
             $class = self::$handler[$type];
         }
 
         $config = $config ? $config : self::getConfs($type);
+        $name   = md5(serialize($config) . $type);
 
-        $name = md5(serialize($config) . $type);
         if (!isset(self::$instance[$name])) {
             self::$instance[$name] = new $class($config);
         }
@@ -31,15 +39,32 @@ class Db
         return self::$instance[$name];
     }
 
+    /**
+     * 通过配置文件链接指定数据库
+     * @date   2020-12-04T14:35:09+0800
+     * @author ChenMingjiang
+     * @param  string                   $file [description]
+     * @return [type]                   [description]
+     */
+    public static function connectionPath(string $file)
+    {
+        return self::connection($type, $config);
+    }
+
     public static function getConfs($name)
     {
-        $config = Config::includes(Config::get('db_file'))[$name];
+
+        $config = Config::includes(Config::get('db_file'));
+
+        if (!isset($config[$name])) {
+            throw new Exception("Not Find db.Type Conf from :" . Config::get('db_file') . '[' . $name . ']');
+        }
 
         if (!$config) {
             throw new Exception("Not Find db Conf from :" . Config::get('db_file') . '[' . $name . ']');
         }
 
-        return $config;
+        return $config[$name];
 
     }
 
