@@ -47,7 +47,7 @@ class Controller
     protected function view(string $viewPath = '', array $viewParamData = [], array $options = [])
     {
         // 单个视图关闭调试模式
-        $options['trace'] = isset($options['trace']) ? $options['trace'] : true;
+        $options['trace'] = $options['trace'] ?? true;
 
         // view 覆盖 assign
         $viewParamData = array_merge(self::$assign, $viewParamData);
@@ -63,7 +63,7 @@ class Controller
     {
 
         // 单个视图关闭调试模式
-        $trace = isset($options['trace']) ? $options['trace'] : true;
+        $trace = $options['trace'] ?? true;
 
         echo Template::parseContent(['view' => $viewPath, 'data' => $viewParamData]);
 
