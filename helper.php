@@ -36,9 +36,14 @@ if (!function_exists('auth')) {
 
         $ckey_length = 4;
         $key         = md5($key != '' ? $key : config('auth_key'));
-        $keya        = md5(substr($key, 0, 16));
-        $keyb        = md5(substr($key, 16, 16));
-        $keyc        = $ckey_length ? ($operation == 'DECODE' ? substr($string, 0, $ckey_length) : substr(md5(microtime()), -$ckey_length)) : '';
+
+        if (!$key) {
+            return false;
+        }
+
+        $keya = md5(substr($key, 0, 16));
+        $keyb = md5(substr($key, 16, 16));
+        $keyc = $ckey_length ? ($operation == 'DECODE' ? substr($string, 0, $ckey_length) : substr(md5(microtime()), -$ckey_length)) : '';
 
         $cryptkey   = $keya . md5($keya . $keyc);
         $key_length = strlen($cryptkey);
@@ -87,8 +92,8 @@ if (!function_exists('config')) {
      * 获取配置基础信息
      * @date   2018-07-12T17:08:40+0800
      * @author ChenMingjiang
-     * @param  string                   $name [description]
-     * @param  string                   $path [description]
+     * @param  string                   $name [请求key值]
+     * @param  string                   $path [请求conf文件 默认config.php]
      * @return [type]                         [description]
      */
     function config($name = null, $path = '')
@@ -104,31 +109,39 @@ if (!function_exists('cookie')) {
      * Cookie操作
      * @date   2018-07-12T17:08:01+0800
      * @author ChenMingjiang
-     * @param  string                   $name    [description]
-     * @param  string                   $value   [description]
+     * @param  string                   $name    [名称]
+     * @param  string                   $value   [值]
      * @param  array                    $options [description]
+     *                                           prefix 名称前缀
+     *                                           expire 过期时间
+     *                                           domain 作用域
+     *                                           secure  => true || false
+     *                                           httponly => true || false
+     *                                           samesite => None || Lax  || Strict 默认Lax
+     *                                           auth true:加密 false:不加密 默认加密
      * @return [type]                            [description]
      */
     function cookie($name = '', $value = '', $options = [])
     {
 
+        // 合并配置信息
         $config = array_merge(Config::get('cookie'), array_change_key_case((array) $options));
 
         if (!$name) {
             return false;
         }
 
-        $name   = $config['prefix'] ? $config['prefix'] . $name : $name;
-        $expire = $config['expire'] ? TIME + $config['expire'] : 0;
+        $name = $config['prefix'] ? $config['prefix'] . $name : $name;
 
         if (is_array($value)) {
             $value = json_encode($value);
         }
 
         if ($value === '') {
+
             if (isset($_COOKIE[$name])) {
                 $data = $_COOKIE[$name];
-                $data = $config['auth'] ? auth($data, 'DECODE') : $data;
+                $data = isset($config['auth']) && $config['auth'] ? auth($data, 'DECODE') : $data;
                 if (stripos($data, '{') !== false) {
                     $data = json_decode($data, true);
                 }
@@ -137,12 +150,22 @@ if (!function_exists('cookie')) {
             return isset($data) ? $data : '';
         }
 
-        //内容加密
-        if ($config['auth']) {
+        // 内容加密
+        if (isset($config['auth']) && $config['auth']) {
             $value = auth($value);
         }
 
-        setcookie($name, $value, $expire, $config['path'], $config['domain']);
+
+        $setOptions = [
+            'expires'  => isset($config['expire']) && $config['expire'] ? (TIME + $config['expire']) : 0,
+            'path'     => $config['path'] ?? '/',
+            'domain'   => $config['domain'] ?? '',
+            'httponly' => $config['httponly'] ?? false,
+            'secure'   => $config['secure'] ?? true,
+            'samesite' => $config['samesite'] ?? '',
+        ];
+
+        setcookie($name, $value, $setOptions);
     }
 }
 
@@ -215,22 +238,18 @@ if (!function_exists('zipStr')) {
      * [压缩字符串]
      * @date   2018-07-12T17:06:15+0800
      * @author ChenMingjiang
-     * @param  [type]                   $value     [description]
+     * @param  [type]                   $value     [字符串值]
      * @param  string                   $operation [ENCODE为加密，DECODE为解密]
      * @return [type]                              [description]
      */
     function zipStr($value, $operation = 'ENCODE')
     {
         if ($operation == 'ENCODE') {
-            $value = is_array($value) ? json_encode($value) : $value;
-            $value = gzcompress($value, 9);
-            $value = base64_encode($value);
+            $value = base64_encode(gzcompress(serialize($value), 9));
             $value = str_replace(array('+', '/', '='), array('-', '_', ''), $value);
         } elseif ($operation == 'DECODE') {
             $value = str_replace(array('-', '_', ''), array('+', '/', '='), $value);
-
-            $value = base64_decode($value);
-            $value = gzuncompress($value);
+            $value = unserialize(gzuncompress(base64_decode($value)));
         }
 
         return $value;
@@ -275,9 +294,9 @@ if (!function_exists('get')) {
      * GET过滤
      * @date   2018-07-12T17:10:04+0800
      * @author ChenMingjiang
-     * @param  [type]                   $name    [description]
-     * @param  string                   $type    [description]
-     * @param  string                   $default [description]
+     * @param  [type]                   $name    [名称]
+     * @param  string                   $type    [过滤类型]
+     * @param  string                   $default [默认值]
      * @return [type]                            [description]
      */
     function get($name = null, $type = '', $default = '')
@@ -418,7 +437,7 @@ if (!function_exists('imgUrl')) {
 
         foreach ($imgName as $imgName) {
             if (!$imgName) {
-                $url = HttpResource::getHost() . config('ststic') . '/default.png';
+                $url = HttpResource::getHost() . Config::get('ststic') . '/default.png';
             } elseif ($size) {
                 $url = zipimg($imgName, $path, $size);
             } else {
@@ -431,7 +450,7 @@ if (!function_exists('imgUrl')) {
                 if ($host && $imgName) {
                     $url = $host . $url;
                 } else {
-                    $url = HttpResource::getHost() . config('uploadfile') . $url;
+                    $url = HttpResource::getHost() . Config::get('uploadfile') . $url;
                 }
 
             }
@@ -529,14 +548,14 @@ if (!function_exists('response')) {
      *                                           out_time(int):指定超时时间 默认10秒
      * @return [type]                   [description]
      */
-    function response($url, $method = 'GET', $param = [], $headers = [], $options = [])
+    function response(string $url, string $method = 'GET', $param = [], array $headers = [], array $options = [])
     {
 
-        $isJson  = isset($options['is_json']) ? $options['is_json'] : true;
-        $debug   = isset($options['debug']) ? $options['debug'] : false;
-        $ssl     = isset($options['ssl']) ? $options['ssl'] : [];
-        $isCode  = isset($options['is_code']) ? $options['is_code'] : false;
-        $outTime = isset($options['out_time']) ? $options['out_time'] : 10;
+        $isJson  = $options['is_json'] ?? true;
+        $debug   = $options['debug'] ?? false;
+        $ssl     = $options['ssl'] ?? [];
+        $isCode  = $options['is_code'] ?? false;
+        $outTime = $options['out_time'] ?? 10;
 
         $ch = curl_init(); // 初始化curl
 
@@ -663,7 +682,7 @@ if (!function_exists('strCut')) {
      * @param  string                   $default [截取后显示后缀]
      * @return [type]                            [description]
      */
-    function strCut($str, $length = 0, $default = '...')
+    function strCut(string $str, int $length = 0, string $default = '...')
     {
 
         if (mb_strlen($str) > $length) {
@@ -769,10 +788,10 @@ if (!function_exists('url')) {
     /**
      * 创建url
      * ------------------------
-     * | {F:url()} to /MODULE/CONTROLLER/ACTION
-     * | {F:url('xxxx')} to /MODULE/CONTROLLER/xxx
-     * | {F:url('/aaa/bbb/ccc/ddd')} to /aaa/bbb/ccc/ddd
-     * | {F:url('aaa/bbbb')} to /MODULE/aaa/bbb
+     * | {:url()} to /MODULE/CONTROLLER/ACTION
+     * | {:url('xxxx')} to /MODULE/CONTROLLER/xxx
+     * | {:url('/aaa/bbb/ccc/ddd')} to /aaa/bbb/ccc/ddd
+     * | {:url('aaa/bbbb')} to /MODULE/aaa/bbb
      * ------------------------
      * @date   2018-07-06T10:50:29+0800
      * @author ChenMingjiang
@@ -787,9 +806,9 @@ if (!function_exists('url')) {
     function url($location = null, $params = [], $options = [])
     {
 
-        $hostUrl = isset($options['host']) ? $options['host'] : HttpResource::getHost(); // 前缀域名
-        $isGet   = isset($options['is_get']) ? $options['is_get'] : true; // 开启伪静态 true开启 false关闭
-        $isRoute = isset($options['is_route']) ? $options['is_route'] : true; // 开启路由改写 true开启 false关闭
+        $hostUrl = $options['host'] ?? HttpResource::getHost(); // 前缀域名
+        $isGet   = $options['is_get'] ?? true; // 开启伪静态 true开启 false关闭
+        $isRoute = $options['is_route'] ?? true; // 开启路由改写 true开启 false关闭
 
         // 外链直接返回
         if (stripos($location, 'http://') !== false || stripos($location, 'https://') !== false) {
@@ -838,11 +857,11 @@ if (!function_exists('url')) {
                     $values  = '';
                     $lastKey = key($value);
                     foreach ($value as $field => $v) {
-                        if ($lastKey == $field) {
-                            $values .= $key . '[' . $field . ']' . $explode . $v;
-                        } else {
-                            $values .= $key . '[' . $field . ']' . $explode . $v . $explode;
-                        }
+                        // if ($lastKey == $field) {
+                        //     $values .= $key . '[' . $field . ']' . $explode . $v. $explode;
+                        // } else {
+                        $values .= $key . '[' . $field . ']' . $explode . $v . $explode;
+                        // }
                     }
                 } else {
                     $values = $key . $explode . $value;
