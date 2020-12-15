@@ -38,7 +38,7 @@ class App
 
         App::loadConfig($configPath);
 
-        if (!self::$config['debug']) {
+        if (isset(self::$config['debug']) && !self::$config['debug']) {
             Exception::hide(HttpResource::initInstance(), self::$config); // 隐藏错误提示
         }
 
@@ -91,9 +91,14 @@ class App
     {
         // 获取配置文档信息
         if ($path) {
-            self::$config = Config::includes([self::$build['config'], $path]);
+            self::$config          = Config::includes([self::$build['config'], $path]);
+            self::$build['config'] = $path;
         } else {
             self::$config = Config::includes();
+        }
+
+        if (!self::$config) {
+            throw new Exception('not  find config from ' . self::$build['config']);
         }
     }
 

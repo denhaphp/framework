@@ -26,7 +26,6 @@ class Mysql extends Container
             foreach ($this->bulid['params'] as $bulids) {
                 foreach ($bulids as $item) {
                     $statement->bindParam(...$this->buildParam($item));
-
                 }
             }
         }
