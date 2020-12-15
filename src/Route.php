@@ -143,12 +143,12 @@ class Route
             return false;
         }
 
-        $params      = isset($options['params']) ? $options['params'] : '';
-        $suffix      = isset($options['suffix']) ? $options['suffix'] : '/';
+        $params      = $options['params'] ?? '';
+        $suffix      = $options['suffix'] ?? '/';
+        $oldUriHide  = $options['old_uri_hide'] ?? Config::get('route')['old_uri_hide'];
+        $hidenField  = $options['hiden_field'] ?? false;
+        $jump        = $options['jump'] ?? false;
         $limitSuffix = isset($options['limit_suffix']) ? explode(',', $options['limit_suffix']) : '';
-        $oldUriHide  = isset($options['old_uri_hide']) ? $options['old_uri_hide'] : Config::get('route')['old_uri_hide'];
-        $hidenField  = isset($options['hiden_field']) ? $options['hiden_field'] : false;
-        $jump        = isset($options['jump']) ? $options['jump'] : false;
 
         self::$rule[self::$id] = [
             'url'          => $url,
