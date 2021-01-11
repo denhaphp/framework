@@ -161,7 +161,7 @@ if (!function_exists('cookie')) {
             'path'     => $config['path'] ?? '/',
             'domain'   => $config['domain'] ?? '',
             'httponly' => $config['httponly'] ?? false,
-            'secure'   => $config['secure'] ?? true,
+            'secure'   => $config['secure'] ?? false,
             'samesite' => $config['samesite'] ?? '',
         ];
 
