@@ -188,6 +188,12 @@ abstract class Container
         return $this->link->lastInsertId();
     }
 
+    /** 关闭数据库 */
+    public function close()
+    {
+        $this->config[$this->dbFileId] = null;
+    }
+
     /**
      * 链接
      * @date   2020-02-15T17:17:05+0800
@@ -558,8 +564,12 @@ abstract class Container
      * @param  [type]                   $limit [description]
      * @return [type]                          [description]
      */
-    public function limit(int $limit = 0, $pageSize = '')
+    public function limit($limit = 0, $pageSize = '')
     {
+
+        if (is_array($limit)) {
+            list($limit, $pageSize) = $limit;
+        }
 
         $this->options['limit'] = ['offset' => $limit, 'pageSize' => $pageSize];
 
@@ -574,7 +584,7 @@ abstract class Container
             return $this;
         }
 
-        $this->options['field'] = is_array($field) ? $field : explode(',', $field);
+        $this->options['field'] = (is_array($field) || stripos($field, '(') !== false) ? (array) $field : explode(',', $field);
 
         return $this;
     }
@@ -1223,7 +1233,7 @@ abstract class Container
      * @param  [type]                   $field [description]
      * @return [type]                          [description]
      */
-    public function column(string $field)
+    public function column(string $field = '')
     {
         // 执行获取缓存数据
         if (($result = $this->getCache(__FUNCTION__)) !== false) {
@@ -1239,7 +1249,7 @@ abstract class Container
         while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
 
             if (count($this->options['field']) == 2 && !in_array('*', $this->options['field'])) {
-                $data[$row[$this->options['field'][0]]] = $row[$this->options['field'][1]];
+                $data[$row[$this->options['field'][1]]] = $row[$this->options['field'][0]];
             } elseif (count($this->options['field']) >= 2) {
                 $data[$row[end($this->options['field'])]] = $row;
             } else {
@@ -1554,7 +1564,7 @@ abstract class Container
 
         $this->debug(false, $result);
 
-        return $this->PDOStatement;
+        return $result === false ? false : $this->PDOStatement;
 
     }
 
