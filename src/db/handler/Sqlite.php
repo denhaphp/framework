@@ -35,7 +35,7 @@ class Sqlite extends Container
         $this->field($field);
         $this->parseField();
 
-        $sql = 'PRAGMA table_info( ' . $this->bulid['field'] . ' )';
+        $sql = 'PRAGMA table_info( ' . $this->build['field'] . ' )';
 
         $result = $this->query($sql);
         $list   = $result->fetchAll(PDO::FETCH_ASSOC);

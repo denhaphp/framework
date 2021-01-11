@@ -20,11 +20,11 @@ class Mysql extends Container
     protected function explain()
     {
 
-        $statement = $this->link->prepare('explain ' . $this->bulid['sql']);
+        $statement = $this->link->prepare('explain ' . $this->build['sql']);
 
-        if (isset($this->bulid['params']) && $this->bulid['params']) {
-            foreach ($this->bulid['params'] as $bulids) {
-                foreach ($bulids as $item) {
+        if (isset($this->build['params']) && $this->build['params']) {
+            foreach ($this->build['params'] as $builds) {
+                foreach ($builds as $item) {
                     $statement->bindParam(...$this->buildParam($item));
                 }
             }
@@ -50,16 +50,16 @@ class Mysql extends Container
         $this->field($field);
         $this->parseField();
 
-        $where = ' WHERE table_name = \'' . $this->bulid['table'] . '\'';
+        $where = ' WHERE table_name = \'' . $this->build['table'] . '\'';
         if (isset($this->options['group']) && $this->options['group']) {
             $where .= $this->parseGroup();
         }
 
-        $this->bulid['sql'] = 'SELECT ' . $this->bulid['field'] . ' from information_schema.columns ' . $where;
-        $result             = $this->query($this->bulid['sql']);
+        $this->build['sql'] = 'SELECT ' . $this->build['field'] . ' from information_schema.columns ' . $where;
+        $result             = $this->query($this->build['sql']);
         $list               = $result->fetchAll(PDO::FETCH_ASSOC);
 
-        if (count($this->options['field']) == 1) {
+        if (count($this->options['field']) == 1 && $this->options['field'][0] != '*') {
             foreach ($list as $key => $value) {
                 $data[] = $value[$field];
             }
