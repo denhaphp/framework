@@ -140,7 +140,8 @@ class App
 
         $object = new ReflectionClass(HttpResource::getClass()); // 获取类信息
 
-        $request = &HttpResource::$request;
+        $request = HttpResource::$instance->setRequest();
+
         // 进入post提交方法
         if (($request['method'] == 'POST') && $object->hasMethod($action . 'Post')) {
             $methodAction = $action . 'Post';
@@ -155,8 +156,10 @@ class App
             throw new Exception(HttpResource::getClass() . ' NOT PUBLIC [ ' . $methodAction . ' ] ACTION');
         }
 
+        // 绑定参数
         $params = [];
         foreach ($method->getParameters() as $item) {
+
             if ($request['method'] == 'POST' && isset($request['params']['post'][$item->name])) {
                 $params[$item->name] = $request['params']['post'][$item->name];
             } elseif ($request['method'] == 'GET' && isset($request['params']['get'][$item->name])) {
