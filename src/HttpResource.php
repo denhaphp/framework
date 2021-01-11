@@ -20,14 +20,6 @@ class HttpResource
 
         'other' => '\.\.[\\\\\/].*\%00([^0-9a-fA-F]|$)|%00[\'\\\'\.]'];
 
-    public function __construct()
-    {
-
-        if (!self::$request) {
-            self::setRequest();
-        }
-    }
-
     // 获取实例
     public static function initInstance()
     {
@@ -48,6 +40,8 @@ class HttpResource
         self::$request['params']['files'] = self::files();
 
         self::xssRule($_COOKIE); // 过滤Cookie信息
+
+        return self::$request;
     }
 
     public static function isAjax()
