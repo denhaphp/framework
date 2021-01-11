@@ -73,6 +73,21 @@ class Controller
         }
 
     }
+    protected function fetch_html($viewPath = '', array $viewParamData = [], array $options = [])
+    {
+        $view = $this->view($viewPath,$viewParamData);
+
+        // 单个视图关闭调试模式
+        $trace = $options['trace'] ?? true;
+
+        return Template::parseContent(['view' => $viewPath, 'data' => $view[1]]);
+
+        // 模块debug功能
+        if (Config::get('trace') && $trace) {
+            Trace::run();
+        }
+
+    }
 
     /**
      * ajax返回
