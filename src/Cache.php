@@ -36,22 +36,22 @@ class Cache
     public static function __callStatic($name, $options = [])
     {
 
-        $names = ['set', 'get', 'delete', 'has', 'getMultiple', 'setMultiple', 'deleteMultiple', 'clear'];
+        // $names = ['set', 'get', 'delete', 'has', 'getMultiple', 'setMultiple', 'deleteMultiple', 'clear'];
 
-        if (in_array($name, $names)) {
-            return Cache::create()->$name(...$options);
-        }
+        // if (in_array($name, $names)) {
+        return Cache::create()->$name(...$options);
+        // }
 
-        if ($options) {
-            if (!Config::get('cache')[$name]) {
-                throw new Exception("Cache Config Name Not Find : cache." . $name);
-            }
+        // if ($options) {
+        //     if (!Config::get('cache')[$name]) {
+        //         throw new Exception("Cache Config Name Not Find : cache." . $name);
+        //     }
 
-            $config = array_merge(Config::get('cache')[$name], $options);
-            return Cache::create($config);
-        }
+        //     $config = array_merge(Config::get('cache')[$name], $options);
+        //     return Cache::create($config);
+        // }
 
-        return Cache::channel($name);
+        // return Cache::channel($name);
     }
 
 }
