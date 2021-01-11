@@ -24,16 +24,25 @@ class Pages
         $this->pageSize       = $pageSize ? $pageSize : $this->pageSize;
         $this->pageUrl        = $pageUrl ? $pageUrl : $this->pageUrl;
         $this->showPageFigure = $showPageFigure ? $showPageFigure : $this->showPageFigure;
+
+        $this->init();
     }
 
-    protected function pages()
+    public function getLimit()
+    {
+        return [max(($this->pageNo - 1), 0) * $this->pageSize, $this->pageSize];
+    }
+
+    protected function init()
     {
         if ($this->total == 0) {
             return false;
         }
+
         $this->allPage = (int) ceil($this->total / $this->pageSize);
+
         if ($this->pageNo > $this->allPage) {
-            abort('请选择正确的页码');
+            $this->pageNo = $this->allPage;
         }
 
         $startPage = 1;
@@ -73,9 +82,24 @@ class Pages
 
     }
 
+    public function pageJump()
+    {
+        $pages = [10, 20, 50, 100];
+
+        $html = '<select class="form-control" onchange="self.location.href=options[selectedIndex].value" style="display:inline-block;width:auto">' . PHP_EOL;
+        foreach ($pages as $value) {
+            $isChecked = $this->pageSize == $value ? 'selected="selected"' : '';
+            $html .= '<option value="' . $this->pageUrl . $this->pageNo . '&pageSize=' . $value . '" ' . $isChecked . '>' . $value . '</option>' . PHP_EOL;
+        }
+
+        $html .= '</select>' . PHP_EOL;
+
+        return $html;
+    }
+
     public function loadConsole()
     {
-        $this->pages();
+
         if ($this->allPage > 1) {
             if (stripos($this->pageUrl, '?') === false) {
                 $this->pageUrl = $this->pageUrl . '?pageNo=';
@@ -83,31 +107,34 @@ class Pages
                 $this->pageUrl = $this->pageUrl . '&pageNo=';
             }
 
-            $pages = '<div class="pull-right page-box">' . "\r\n";
-            $pages .= '<div class="pagination-info visible-lg-inline">当前' . $this->pageNo . ' - ' . ($this->pageNo * $this->pageSize) . '/' . ($this->allPage * $this->pageSize) . ' 条</div>' . "\r\n";
-            $pages .= '<ul class="pagination" >' . "\r\n";
+            $pages = '<div class="pull-right page-box">' . PHP_EOL;
+            $pages .= '<div class="pagination-info visible-lg-inline">当前' . $this->pageNo . ' - ' . ($this->allPage == $this->pageNo ? $this->total : ($this->pageNo * $this->pageSize)) . '/' . $this->total . ' 条</div>' . PHP_EOL;
+
+            $pages .= '<ul class="pagination" >' . PHP_EOL;
             if ($this->pageNo > $this->showPageFigure) {
-                $pages .= '<li><a href="' . $this->pageUrl . '1">«</a></li>' . "\r\n";
+                $pages .= '<li><a href="' . $this->pageUrl . '1">«</a></li>' . PHP_EOL;
             }
 
             if ($this->pageNo > 1) {
-                $pages .= '<li><a href="' . $this->pageUrl . max(($this->pageNo - 1), 1) . '">‹</a></li>' . "\r\n";
+                $pages .= '<li><a href="' . $this->pageUrl . max(($this->pageNo - 1), 1) . '">‹</a></li>' . PHP_EOL;
             }
 
             if ($this->pageList) {
                 foreach ($this->pageList as $key => $value) {
                     $value == $this->pageNo ? $class = 'class="active"' : $class = '';
-                    $pages .= '<li ' . $class . '><a href="' . $this->pageUrl . $value . '">' . $value . '</a></li>' . "\r\n";
+                    $pages .= '<li ' . $class . '><a href="' . $this->pageUrl . $value . '">' . $value . '</a></li>' . PHP_EOL;
                 }
             }
-            $pages .= '<li><a href="' . $this->pageUrl . min(($this->pageNo + 1), $this->allPage) . '">›</a></li>' . "\r\n";
-            $pages .= '<li><a href="' . $this->pageUrl . $this->allPage . '">»</a></li>' . "\r\n";
-            $pages .= '</ul>' . "\r\n";
-            $pages .= '<span class="pagination-goto visible-lg-inline">' . "\r\n";
-            $pages .= '<input type="text" class="form-control w40">' . "\r\n";
-            $pages .= '<button class="btn btn-default" type="button" >GO</button>' . "\r\n";
-            $pages .= '</span>' . "\r\n";
-            $pages .= '</div>' . "\r\n";
+
+            $pages .= '<li><a href="' . $this->pageUrl . min(($this->pageNo + 1), $this->allPage) . '">›</a></li>' . PHP_EOL;
+            $pages .= '<li><a href="' . $this->pageUrl . $this->allPage . '">»</a></li>' . PHP_EOL;
+            $pages .= '</ul>' . PHP_EOL;
+            $pages .= $this->pageJump();
+            $pages .= '<span class="pagination-goto visible-lg-inline">' . PHP_EOL;
+            $pages .= '<input type="text" class="form-control w40 dh-page-go-value">' . PHP_EOL;
+            $pages .= '<button class="btn btn-default dh-page-go" type="button" data-url="' . $this->pageUrl . '">GO</button>' . PHP_EOL;
+            $pages .= '</span>' . PHP_EOL;
+            $pages .= '</div>' . PHP_EOL;
 
             return $pages;
         }
@@ -115,7 +142,6 @@ class Pages
 
     public function loadPc()
     {
-        $this->pages();
         if ($this->allPage > 1) {
             if (stripos($this->pageUrl, '?') === false) {
                 $this->pageUrl = $this->pageUrl . '?pageNo=';
@@ -123,29 +149,29 @@ class Pages
                 $this->pageUrl = $this->pageUrl . '&pageNo=';
             }
 
-            $pages = '<div class="pull-left page-box">' . "\r\n";
-            $pages .= '<div class="pagination-info hidden-sm hidden-xs">当前' . $this->pageNo . ' - ' . ($this->pageNo * $this->pageSize) . '/' . ($this->allPage * $this->pageSize) . ' 条</div>' . "\r\n";
-            $pages .= '<ul class="pagination hidden-sm hidden-xs" >' . "\r\n";
+            $pages = '<div class="pull-left page-box">' . PHP_EOL;
+            $pages .= '<div class="pagination-info hidden-sm hidden-xs">当前' . $this->pageNo . ' - ' . ($this->pageNo * $this->pageSize) . '/' . ($this->allPage * $this->pageSize) . ' 条</div>' . PHP_EOL;
+            $pages .= '<ul class="pagination hidden-sm hidden-xs" >' . PHP_EOL;
             if ($this->pageNo > $this->showPageFigure) {
-                $pages .= '<li><a href="' . $this->pageUrl . '1">«</a></li>' . "\r\n";
+                $pages .= '<li><a href="' . $this->pageUrl . '1">«</a></li>' . PHP_EOL;
             }
 
             if ($this->pageNo > 1) {
-                $pages .= '<li><a href="' . $this->pageUrl . max(($this->pageNo - 1), 1) . '">‹</a></li>' . "\r\n";
+                $pages .= '<li><a href="' . $this->pageUrl . max(($this->pageNo - 1), 1) . '">‹</a></li>' . PHP_EOL;
             }
 
             if ($this->pageList) {
                 foreach ($this->pageList as $key => $value) {
                     $value == $this->pageNo ? $class = 'class="active"' : $class = '';
-                    $pages .= '<li ' . $class . '><a href="' . $this->pageUrl . $value . '">' . $value . '</a></li>' . "\r\n";
+                    $pages .= '<li ' . $class . '><a href="' . $this->pageUrl . $value . '">' . $value . '</a></li>' . PHP_EOL;
                 }
             }
-            $pages .= '<li><a href="' . $this->pageUrl . min(($this->pageNo + 1), $this->allPage) . '">›</a></li>' . "\r\n";
-            $pages .= '<li><a href="' . $this->pageUrl . $this->allPage . '">»</a></li>' . "\r\n";
-            $pages .= '</ul>' . "\r\n";
-            $pages .= '<span class="pagination-goto">' . "\r\n";
-            $pages .= '</span>' . "\r\n";
-            $pages .= '</div>' . "\r\n";
+            $pages .= '<li><a href="' . $this->pageUrl . min(($this->pageNo + 1), $this->allPage) . '">›</a></li>' . PHP_EOL;
+            $pages .= '<li><a href="' . $this->pageUrl . $this->allPage . '">»</a></li>' . PHP_EOL;
+            $pages .= '</ul>' . PHP_EOL;
+            $pages .= '<span class="pagination-goto">' . PHP_EOL;
+            $pages .= '</span>' . PHP_EOL;
+            $pages .= '</div>' . PHP_EOL;
 
             return $pages;
         }
@@ -153,7 +179,6 @@ class Pages
 
     public function pc()
     {
-        $this->pages();
         if ($this->allPage > 1) {
             if (stripos($this->pageUrl, '?') === false) {
                 $this->pageUrl = $this->pageUrl . '?pageNo=';
@@ -161,33 +186,33 @@ class Pages
                 $this->pageUrl = $this->pageUrl . '&pageNo=';
             }
 
-            $pages = '<ul class="pagination hidden-sm hidden-xs" >' . "\r\n";
+            $pages = '<ul class="pagination hidden-sm hidden-xs" >' . PHP_EOL;
 
-            $pages .= '<li><a href="' . $this->pageUrl . '1">首页</a></li>' . "\r\n";
+            $pages .= '<li><a href="' . $this->pageUrl . '1">首页</a></li>' . PHP_EOL;
 
             if ($this->pageNo > $this->showPageFigure) {
-                $pages .= '<li><a href="' . $this->pageUrl . '1">«</a></li>' . "\r\n";
+                $pages .= '<li><a href="' . $this->pageUrl . '1">«</a></li>' . PHP_EOL;
             }
 
             if ($this->pageNo > 1) {
-                $pages .= '<li><a href="' . $this->pageUrl . max(($this->pageNo - 1), 1) . '">‹</a></li>' . "\r\n";
+                $pages .= '<li><a href="' . $this->pageUrl . max(($this->pageNo - 1), 1) . '">‹</a></li>' . PHP_EOL;
             }
 
             if ($this->pageList) {
                 foreach ($this->pageList as $key => $value) {
                     $value == $this->pageNo ? $class = 'class="active"' : $class = '';
-                    
+
                     $pageUrl = $class != '' ? 'javascript:;' : $this->pageUrl . $value;
 
-                    $pages .= '<li ' . $class . '><a href="' . $pageUrl . '">' . $value . '</a></li>' . "\r\n";
+                    $pages .= '<li ' . $class . '><a href="' . $pageUrl . '">' . $value . '</a></li>' . PHP_EOL;
                 }
             }
-            $pages .= '<li><a href="' . $this->pageUrl . min(($this->pageNo + 1), $this->allPage) . '">›</a></li>' . "\r\n";
-            $pages .= '<li><a href="' . $this->pageUrl . $this->allPage . '">»</a></li>' . "\r\n";
-            $pages .= '</ul>' . "\r\n";
-            $pages .= '<span class="pagination-goto">' . "\r\n";
-            $pages .= '</span>' . "\r\n";
-            // $pages .= '</div>' . "\r\n";
+            $pages .= '<li><a href="' . $this->pageUrl . min(($this->pageNo + 1), $this->allPage) . '">›</a></li>' . PHP_EOL;
+            $pages .= '<li><a href="' . $this->pageUrl . $this->allPage . '">»</a></li>' . PHP_EOL;
+            $pages .= '</ul>' . PHP_EOL;
+            $pages .= '<span class="pagination-goto">' . PHP_EOL;
+            $pages .= '</span>' . PHP_EOL;
+            // $pages .= '</div>' . PHP_EOL;
 
             return $pages;
         }
