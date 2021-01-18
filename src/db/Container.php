@@ -209,8 +209,10 @@ abstract class Container
             $this->connectWrite();
         }
 
-        if (!$this->link->getAttribute(PDO::ATTR_SERVER_INFO)) {
-            throw new Exception('SQL Service Link Infomation Abnor');
+        try {
+            $this->link->getAttribute(PDO::ATTR_SERVER_INFO);
+        } catch (\PDOException $e) {
+            throw new Exception($e->getMessage());
         }
 
         return $this;
@@ -241,7 +243,9 @@ abstract class Container
         }
 
         // 断线重连
-        if (!$config['write']['pdo']->getAttribute(PDO::ATTR_SERVER_INFO)) {
+        try {
+            $config['write']['pdo']->getAttribute(PDO::ATTR_SERVER_INFO);
+        } catch (\PDOException $e) {
             $config['write']['pdo'] = $this->open($config['write']);
         }
 
@@ -282,7 +286,9 @@ abstract class Container
         }
 
         // 断线重连
-        if (!$config['read']['pdo']->getAttribute(PDO::ATTR_SERVER_INFO)) {
+        try {
+            $config['read']['pdo']->getAttribute(PDO::ATTR_SERVER_INFO);
+        } catch (\PDOException $e) {
             $config['read']['pdo'] = $this->open($config['read']);
         }
 
