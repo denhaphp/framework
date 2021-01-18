@@ -1491,7 +1491,8 @@ abstract class Container
      */
     public function getCache($prefix)
     {
-        if (isset($this->options['cache']['key']) && $this->options['cache']['key'] === true && $this->options['map']) {
+
+        if (isset($this->options['cache']['key']) && $this->options['cache']['key'] === true) {
 
             $this->options['cache']['key'] = $prefix . md5(json_encode($this->options['map']) . json_encode($this->build['params']));
 

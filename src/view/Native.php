@@ -56,6 +56,26 @@ class Native
         include $this->cacheTplPath;
 
         $content = ob_get_clean();
+        $content = $this->parsepower($content);//解析权限
+        return $content;
+    }
+    /**
+     * 解析权限
+     * @return [type]                   [description]
+     */
+    public function parsepower($content)
+    {
+        $content = preg_replace_callback('|<a[^>]*dh-power-id="([^"]*)"[^>]*>[^<]*<\/a>|',function ($match) {
+            $userPowers = cookie('user_power_init','',['auth'=>false]);
+            $ids = explode(',', $match[1]);
+            $powers = json_decode($userPowers,true);
+            foreach ($ids as $k => $v) {
+                if(!empty($powers) && !in_array($v,$powers)){
+                    return '';
+                }
+                return $match[0];
+            }
+        },$content);
 
         return $content;
     }
