@@ -103,4 +103,16 @@ class Exception extends \Exception
 
     }
 
+    public static function show($msg)
+    {
+
+        self::$whoops = new ErrorRun;
+
+        self::$whoops->prependHandler(function () {
+            echo $msg;
+        });
+
+        self::$whoops->register();
+    }
+
 }

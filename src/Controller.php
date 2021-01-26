@@ -52,9 +52,9 @@ class Controller
         // view 覆盖 assign
         $viewParamData = array_merge(self::$assign, $viewParamData);
 
-        if (HttpResource::$request['params']['get']) {
-            $viewParamData = array_merge($viewParamData, HttpResource::$request['params']['get']);
-        }
+        // if (HttpResource::$request['params']['get']) {
+        //     $viewParamData = array_merge($viewParamData, HttpResource::$request['params']['get']);
+        // }
 
         return [$viewPath, $viewParamData, $options];
     }
