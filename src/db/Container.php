@@ -1254,12 +1254,13 @@ abstract class Container
 
         while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
 
+
             if (count($this->options['field']) == 2 && !in_array('*', $this->options['field'])) {
-                $data[$row[$this->options['field'][1]]] = $row[$this->options['field'][0]];
+                $data[end($row)] = reset($row);
             } elseif (count($this->options['field']) >= 2) {
-                $data[$row[end($this->options['field'])]] = $row;
+                $data[end($row)] = $row;
             } else {
-                $data[] = $row[$this->options['field'][0]];
+                $data[] = end($row);
             }
         }
 

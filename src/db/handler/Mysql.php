@@ -61,7 +61,7 @@ class Mysql extends Container
 
         if (count($this->options['field']) == 1 && $this->options['field'][0] != '*') {
             foreach ($list as $key => $value) {
-                $data[] = $value[$field];
+                $data[] = end($value);
             }
         } else {
             $data = $list;
