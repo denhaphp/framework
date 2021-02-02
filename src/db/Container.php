@@ -1254,7 +1254,6 @@ abstract class Container
 
         while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
 
-
             if (count($this->options['field']) == 2 && !in_array('*', $this->options['field'])) {
                 $data[end($row)] = reset($row);
             } elseif (count($this->options['field']) >= 2) {
@@ -1645,7 +1644,9 @@ abstract class Container
                     $value = var_export($value, 1);
                 }
 
-                $sql = str_replace($name, $value, $sql);
+                if (($pos = strpos($sql, $name)) !== false) {
+                    $sql = substr_replace($sql, $value, $pos, strlen($name));
+                }
 
             }
 
