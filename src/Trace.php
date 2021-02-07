@@ -17,6 +17,7 @@ class Trace
 
     public static $errorInfo = []; //错误信息
     public static $sqlInfo   = []; //sql执行信息
+    public static $debug     = []; // 自定义调试信息
 
     // 执行
     public static function run()
@@ -27,6 +28,7 @@ class Trace
     // 展示调试信息
     private static function showTrace()
     {
+
         $trace = [];
         $tabs  = self::$tracePageTabs;
         foreach ($tabs as $name => $title) {
@@ -41,7 +43,7 @@ class Trace
                     $trace[$title] = self::$sqlInfo;
                     break;
                 case 'DEBUG':
-                    $trace[$title] = self::baseInfo();
+                    $trace[$title] = self::$debug;
                     break;
                 default:
                     $trace[$title] = $name;
@@ -50,7 +52,8 @@ class Trace
         }
 
         ob_start();
-        include FARM_PATH . DS . 'trace' . DS . 'debug.html';
+        // include FARM_PATH . DS . 'trace' . DS . 'text.html';
+        include FARM_PATH . DS . 'trace' . DS . 'console.html';
         return ob_get_clean();
     }
 
@@ -84,6 +87,15 @@ class Trace
 
     }
 
+    /** 自定义调试信息 */
+    public static function debug($data = '', $line = __LINE__)
+    {
+        list('file' => $file, 'line' => $line) = debug_backtrace()[0];
+
+        self::$debug[] = is_array($data) ? $file . ' 第' . $line . '行 : ' . json_encode($data) : $file . ' 第' . $line . '行 : ' . $data;
+
+    }
+
     //获取基本信息
     private static function baseInfo()
     {
@@ -96,11 +108,11 @@ class Trace
         }
 
         $base = [
-            '请求信息'    => date('Y-m-d H:i:s', $_SERVER['REQUEST_TIME']) . ' ' . $_SERVER['SERVER_PROTOCOL'] . ' ' . $_SERVER['REQUEST_METHOD'] . ' : ' . strip_tags($_SERVER['REQUEST_URI']),
-            '运行时间'    => number_format(microtime(true) - START_TIME, 6) . ' s 吞吐率 : ' . number_format(1 / (microtime(true) - START_TIME), 2) . 'req/s 内存开销 : ' . number_format((memory_get_usage() - START_USE_MENUS) / 1024, 2) . 'kb',
-            '文件加载'    => count(get_included_files()) . ' 配置加载 : ' . count(App::$config) . ' 配置文件路径:' . App::$build['config'],
+            '请求信息'  => date('Y-m-d H:i:s', $_SERVER['REQUEST_TIME']) . ' ' . $_SERVER['SERVER_PROTOCOL'] . ' ' . $_SERVER['REQUEST_METHOD'] . ' : ' . strip_tags($_SERVER['REQUEST_URI']),
+            '运行时间'  => number_format(microtime(true) - START_TIME, 6) . ' s 吞吐率 : ' . number_format(1 / (microtime(true) - START_TIME), 2) . 'req/s 内存开销 : ' . number_format((memory_get_usage() - START_USE_MENUS) / 1024, 2) . 'kb',
+            '文件加载'  => count(get_included_files()) . ' 配置加载 : ' . count(App::$config) . ' 配置文件路径:' . App::$build['config'],
             '数据库名称' => $dbName . ' 运行时间 : ' . (isset(self::$dbTrace['allTime']) ?? 0),
-            '磁盘信息'    => self::diskInfo(),
+            '磁盘信息'  => self::diskInfo(),
         ];
 
         return $base;

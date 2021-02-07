@@ -1,0 +1,20 @@
+<script type="text/javascript">
+console.groupCollapsed('-----调试信息[ <?php echo reset($trace)['请求信息']; ?> ]');
+<?php foreach($trace as $tag => $info) { ?>
+	<?php 
+	if($tag == '基本'){
+		echo 'console.group("'.$tag.'");'.PHP_EOL;
+	}else{
+		echo 'console.groupCollapsed("'.$tag.'");'.PHP_EOL;
+	}
+
+	if(is_array($info)){
+		foreach ($info as $k=>$val){
+			echo 'console.log("'.(is_numeric($k) ? '' : $k.' : ') . str_replace([PHP_EOL,'"'], ['','\"'],$val) .'");'.PHP_EOL;
+	    }
+	}
+    ?>
+	console.groupEnd();
+<?php  } ?>
+console.groupEnd();
+</script>
