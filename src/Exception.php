@@ -103,16 +103,18 @@ class Exception extends \Exception
 
     }
 
-    public static function show($msg)
+    public function abort(\Closure $closure, $code = 200)
     {
 
         self::$whoops = new ErrorRun;
 
-        self::$whoops->prependHandler(function () {
-            echo $msg;
+        self::$whoops->prependHandler(function () use ($code, $closure) {
+            header("http/1.1 $code");
+            $closure();
         });
 
         self::$whoops->register();
+
     }
 
 }
