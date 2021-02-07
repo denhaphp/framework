@@ -3,6 +3,7 @@
 use denha\Cache;
 use denha\Config;
 use denha\Controller;
+use denha\Cookie;
 use denha\Db;
 use denha\HttpResource;
 use denha\Route;
@@ -83,7 +84,7 @@ if (!function_exists('auth')) {
         }
 
         if ('DECODE' === $operation) {
-            if ((0 === substr($result, 0, 10) || substr($result, 0, 10) - time() > 0) && substr($result, 10, 16) === substr(md5(substr($result, 26) . $keyb), 0, 16)) {
+            if ((0 == substr($result, 0, 10) || substr($result, 0, 10) - time() > 0) && substr($result, 10, 16) == substr(md5(substr($result, 26) . $keyb), 0, 16)) {
                 return substr($result, 26);
             }
 
@@ -123,59 +124,21 @@ if (!function_exists('cookie')) {
      *
      * @param string $name    [名称]
      * @param string $value   [值]
-     * @param array  $options [description]
-     *                        prefix 名称前缀
-     *                        expire 过期时间
-     *                        domain 作用域
-     *                        secure  => true || false
-     *                        httponly => true || false
-     *                        samesite => None || Lax  || Strict 默认Lax
-     *                        auth true:加密 false:不加密 默认加密
-     *
      * @return [type] [description]
      */
-    function cookie($name = '', $value = '', $options = [])
+    function cookie(string $name = '', $value = '')
     {
-        // 合并配置信息
-        $config = array_merge(Config::get('cookie'), array_change_key_case((array) $options));
 
         if (!$name) {
             return false;
         }
 
-        $name = $config['prefix'] ? $config['prefix'] . $name : $name;
-
-        if (is_array($value)) {
-            $value = json_encode($value);
-        }
-
         if ('' === $value) {
-            if (isset($_COOKIE[$name])) {
-                $data = $_COOKIE[$name];
-                $data = isset($config['auth']) && $config['auth'] ? auth($data, 'DECODE') : $data;
-                if (false !== stripos($data, '{')) {
-                    $data = json_decode($data, true);
-                }
-            }
-
-            return isset($data) ? $data : '';
+            return Cookie::get($name);
         }
 
-        // 内容加密
-        if (isset($config['auth']) && $config['auth']) {
-            $value = auth($value);
-        }
+        return Cookie::set($name, $value);
 
-        $setOptions = [
-            'expires'  => isset($config['expire']) && $config['expire'] ? (TIME + $config['expire']) : 0,
-            'path'     => $config['path'] ?? '/',
-            'domain'   => $config['domain'] ?? '',
-            'httponly' => $config['httponly'] ?? false,
-            'secure'   => $config['secure'] ?? false,
-            'samesite' => $config['samesite'] ?? '',
-        ];
-
-        setcookie($name, $value, $setOptions);
     }
 }
 
@@ -566,7 +529,7 @@ if (!function_exists('zipImg')) {
 if (!function_exists('view')) {
     /**
      * 模板渲染.
-     *
+     * 当前方法不继承assgin函数传值内容
      * @date   2018-06-25T20:37:55+0800
      *
      * @author ChenMingjiang
@@ -581,9 +544,7 @@ if (!function_exists('view')) {
      */
     function view($viewPath, $viewParamData = [], $options = [])
     {
-        $Controller = new Controller();
-
-        $this->show($viewPath, $viewParamData, $options);
+        return Controller::fetch($viewPath, $viewParamData, $options);
     }
 }
 

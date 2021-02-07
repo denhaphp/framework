@@ -4,6 +4,7 @@
 //-------------------------
 namespace denha\view;
 
+use denha\Cookie;
 use denha\HttpResource;
 
 class Native
@@ -56,7 +57,7 @@ class Native
         include $this->cacheTplPath;
 
         $content = ob_get_clean();
-        $content = $this->parsepower($content);//解析权限
+        $content = $this->parsepower($content); //解析权限
         return $content;
     }
     /**
@@ -65,17 +66,16 @@ class Native
      */
     public function parsepower($content)
     {
-        $content = preg_replace_callback('|<a[^>]*dh-power-id="([^"]*)"[^>]*>[^<]*<\/a>|',function ($match) {
-            $userPowers = cookie('user_power_init','',['auth'=>false]);
-            $ids = explode(',', $match[1]);
-            $powers = json_decode($userPowers,true);
+        $content = preg_replace_callback('|<a[^>]*dh-power-id="([^"]*)"[^>]*>(((?!<\/a>).)+)<\/a>|', function ($match) {
+            $powers = Cookie::get('user_power_init');
+            $ids    = explode(',', $match[1]);
             foreach ($ids as $k => $v) {
-                if(!empty($powers) && !in_array($v,$powers)){
+                if (!empty($powers) && !in_array($v, $powers)) {
                     return '';
                 }
                 return $match[0];
             }
-        },$content);
+        }, $content);
 
         return $content;
     }
