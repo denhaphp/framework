@@ -1314,7 +1314,7 @@ abstract class Container
         $data = $result->fetch(PDO::FETCH_NUM);
         if ($data == false) {
             foreach ($this->options['field'] as $value) {
-                $data[$value] = '';
+                $data[] = '';
             }
         }
 
