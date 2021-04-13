@@ -445,11 +445,11 @@ abstract class Container
                 $this->type($key, $value);
             }
 
-            return true;
+            return $this;
         }
 
         if (!isset($this->build['params'][$this->addFieldTag($name)])) {
-            return false;
+            return $this;
         }
 
         $fields = &$this->build['params'][$this->addFieldTag($name)];
