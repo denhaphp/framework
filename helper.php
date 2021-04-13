@@ -642,6 +642,7 @@ if (!function_exists('response')) {
         curl_setopt($ch, \CURLOPT_SSL_VERIFYPEER, 0); // 对认证证书来源的检查
         curl_setopt($ch, \CURLOPT_TIMEOUT, $outTime); // 请求超时时间
         curl_setopt($ch, \CURLOPT_URL, $url); // 要访问的地址
+        curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1); // 指定报表头
 
         $data = curl_exec($ch);
         $code = curl_getinfo($ch, \CURLINFO_HTTP_CODE); // 获取返回的状态码
@@ -667,12 +668,12 @@ if (!function_exists('response')) {
             print_r($code . \PHP_EOL);
             print_r('-------END-----' . \PHP_EOL);
             print_r('-------返回结果-----' . \PHP_EOL);
-            if (200 === $code) {
-                print_r($data . \PHP_EOL);
+            if ($code == 200) {
+                print_r($data . PHP_EOL);
             } else {
-                print_r(curl_error($ch) . \PHP_EOL);
+                print_r('curl error:['.curl_errno($ch).'] '.curl_error($ch) . PHP_EOL);
             }
-            print_r('-------END-----' . \PHP_EOL);
+            print_r('-------END-----' . PHP_EOL);
         }
 
         if (200 === $code) {
