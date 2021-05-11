@@ -56,10 +56,12 @@ class Exception extends \Exception
         // 保存错误日志
         if (isset($config['error']['save_log']) && $config['error']['save_log']) {
             self::$whoops->pushHandler(function ($exception, $inspector, $run) {
-                Log::warning($exception->getMessage() . ' From: ' . $exception->getFile() . ' On Line: ' . $exception->getLine(), [
-                    'trace' => $exception->getTrace(),
-                    'url'   => HttpResource::getUri(),
-                ]);
+                if($exception->getMessage() != 'Class app\\Favicon.ico does not exist'){
+                    Log::warning($exception->getMessage() . ' From: ' . $exception->getFile() . ' On Line: ' . $exception->getLine(), [
+                        'trace' => $exception->getTrace(),
+                        'url'   => HttpResource::getUri(),
+                    ]);
+                }
             });
         }
 
@@ -90,13 +92,18 @@ class Exception extends \Exception
         else {
             $handler = new PrettyPageHandler;
             $handler->setPageTitle("denha have errors");
+
+         
             // $handler->setEditor(function ($file, $line) {error_log($file . $line, 3, DATA_RUN_PATH . '1.log');});
             self::$whoops->prependHandler($handler);
         }
 
         // 保存错误日志
         self::$whoops->pushHandler(function ($exception, $inspector, $run) {
-            Log::warning($exception->getMessage() . ' From: ' . $exception->getFile() . ' On Line: ' . $exception->getLine(), $exception->getTrace());
+
+            if($exception->getMessage() != 'Class app\\Favicon.ico does not exist'){
+                Log::warning($exception->getMessage() . ' From: ' . $exception->getFile() . ' On Line: ' . $exception->getLine(), $exception->getTrace());
+            }            
         });
 
         self::$whoops->register();
