@@ -1072,8 +1072,26 @@ abstract class Container
         return $this;
     }
 
-    /**
+     /**
      * 子查询table
+     * @date   2017-11-22T00:45:38+0800
+     * @author ChenMingjiang
+     * @param  [type]                   $table [description]
+     * @return [type]                          [description]
+     */
+    public function childTable(string $table)
+    {
+        
+        $this->init();
+
+        $this->options['table'] = ['name'=>'childTable','is_prefix'=>''];
+        $this->build['table'] = '(' . $table . ') as child';
+
+        return $this;
+    }
+
+    /**
+     * 子查询table[废弃]
      * @date   2017-11-22T00:45:38+0800
      * @author ChenMingjiang
      * @param  [type]                   $table [description]
@@ -1081,6 +1099,7 @@ abstract class Container
      */
     public function childSqlQuery(string $table)
     {
+        
         $this->build['table'] = '(' . $table . ') as child';
 
         return $this;
@@ -1255,9 +1274,9 @@ abstract class Container
         while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
 
             if (count($this->options['field']) == 2 && !in_array('*', $this->options['field'])) {
-                $data[end($row)] = reset($row);
+                $data[$row[$this->options['field'][1]]] = $row[$this->options['field'][0]];
             } elseif (count($this->options['field']) >= 2) {
-                $data[end($row)] = $row;
+                $data[$row[end($this->options['field'])]] = $row;
             } else {
                 $data[] = end($row);
             }
@@ -1314,7 +1333,7 @@ abstract class Container
         $data = $result->fetch(PDO::FETCH_NUM);
         if ($data == false) {
             foreach ($this->options['field'] as $value) {
-                $data[] = '';
+                $data[$value] = '';
             }
         }
 
@@ -1644,9 +1663,7 @@ abstract class Container
                     $value = var_export($value, 1);
                 }
 
-                if (($pos = strpos($sql, $name)) !== false) {
-                    $sql = substr_replace($sql, $value, $pos, strlen($name));
-                }
+                $sql = str_replace($name, $value, $sql);
 
             }
 
