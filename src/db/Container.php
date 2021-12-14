@@ -160,7 +160,7 @@ abstract class Container
             $msg = $e->getMessage();
             if (Config::get('debug')) {
                 foreach ($config as $key => $value) {
-                    $msg .= '[' . $key . ':' . $value . '] ';
+                    $msg .= ' [' . $key . ':' . $value . '] ';
                 }
             }
             throw new Exception($msg);
@@ -445,7 +445,7 @@ abstract class Container
                 $this->type($key, $value);
             }
 
-            return true;
+            return $this;
         }
 
         if (!isset($this->build['params'][$this->addFieldTag($name)])) {
@@ -756,9 +756,9 @@ abstract class Container
         $bankMapExp    = ' ' . trim($mapExp) . ' '; // 格式条件
         $mapLink       = ' ' . $mapLink . ' '; // 连接符
         $expRule       = [
-            ['>', '<', '>=', '<=', '!=', 'like', '<>', '='], // 0
+            ['>', '<', '>=', '<=', '!=', 'like', '<>', '=','not like'], // 0
             ['in', 'not in', 'IN', 'NOT IN'], // 1
-            ['instr', 'INSTR', 'not insrt', 'NOT INSTR'], // 2
+            ['instr', 'INSTR', 'not instr', 'NOT INSTR'], // 2
             ['between', 'BETWEEN'], // 3
             ['or', 'OR'], // 4
             ['_string', '_STRING'], // 5
@@ -766,7 +766,7 @@ abstract class Container
             ['locate', 'LOCATE'], // 7
         ];
 
-        // '>', '<', '>=', '<=', '!=', 'like', '<>'
+        // '>', '<', '>=', '<=', '!=', 'like', '<>', 'not like'
         if (in_array($mapExp, $expRule[0])) {
             // 若field 为id强制转值为整型
             $mapValue = $mapField == '`id`' ? ' ' . (int) $mapValue : $mapValue;
@@ -799,7 +799,7 @@ abstract class Container
             return [$map, $mapLink];
 
         }
-        // 'instr', 'INSTR', 'not insrt', 'NOT INSTR'
+        // 'instr', 'INSTR', 'not instr', 'NOT INSTR'
         elseif (in_array($mapExp, $expRule[2])) {
             $map = $bankMapExp . '(' . $mapField . ',' . $mapValueField . ')';
         }
@@ -1072,26 +1072,8 @@ abstract class Container
         return $this;
     }
 
-     /**
-     * 子查询table
-     * @date   2017-11-22T00:45:38+0800
-     * @author ChenMingjiang
-     * @param  [type]                   $table [description]
-     * @return [type]                          [description]
-     */
-    public function childTable(string $table)
-    {
-        
-        $this->init();
-
-        $this->options['table'] = ['name'=>'childTable','is_prefix'=>''];
-        $this->build['table'] = '(' . $table . ') as child';
-
-        return $this;
-    }
-
     /**
-     * 子查询table[废弃]
+     * 子查询table
      * @date   2017-11-22T00:45:38+0800
      * @author ChenMingjiang
      * @param  [type]                   $table [description]
@@ -1099,7 +1081,6 @@ abstract class Container
      */
     public function childSqlQuery(string $table)
     {
-        
         $this->build['table'] = '(' . $table . ') as child';
 
         return $this;
@@ -1244,7 +1225,7 @@ abstract class Container
         }
 
         // 如果开启缓存则保存缓存
-        return $this->setCache($data ?: '');
+        return $this->setCache(isset($data) ?$data: '');
 
     }
 
@@ -1274,9 +1255,9 @@ abstract class Container
         while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
 
             if (count($this->options['field']) == 2 && !in_array('*', $this->options['field'])) {
-                $data[$row[$this->options['field'][1]]] = $row[$this->options['field'][0]];
+                $data[end($row)] = reset($row);
             } elseif (count($this->options['field']) >= 2) {
-                $data[$row[end($this->options['field'])]] = $row;
+                $data[end($row)] = $row;
             } else {
                 $data[] = end($row);
             }
@@ -1333,7 +1314,7 @@ abstract class Container
         $data = $result->fetch(PDO::FETCH_NUM);
         if ($data == false) {
             foreach ($this->options['field'] as $value) {
-                $data[$value] = '';
+                $data[] = '';
             }
         }
 
@@ -1465,10 +1446,10 @@ abstract class Container
         if ($this->transactions == 1) {
             $this->connect(); // 链接数据库
             $this->link->rollBack();
-        } else {
-            --$this->transactions;
-        }
+        } 
 
+        --$this->transactions;
+        
     }
 
     // 提交事务
@@ -1478,9 +1459,9 @@ abstract class Container
         if ($this->transactions == 1) {
             $this->connect();
             $this->link->commit();
-        } else {
-            --$this->transactions;
-        }
+        } 
+
+        --$this->transactions;
 
     }
 
@@ -1663,7 +1644,9 @@ abstract class Container
                     $value = var_export($value, 1);
                 }
 
-                $sql = str_replace($name, $value, $sql);
+                if (($pos = strpos($sql, $name)) !== false) {
+                    $sql = substr_replace($sql, $value, $pos, strlen($name));
+                }
 
             }
 

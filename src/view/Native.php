@@ -66,8 +66,20 @@ class Native
      */
     public function parsepower($content)
     {
-        $content = preg_replace_callback('|<a[^>]*dh-power-id="([^"]*)"[^>]*>(((?!<\/a>).)+)<\/a>|', function ($match) {
-            $powers = Cookie::get('user_power_init');
+        //$powers = Cookie::get('user_power_init');
+        $powers = session('console')['power'];
+        $content = preg_replace_callback('|<a[^>]*dh-power-id="([^"]*)"[^>]*>(((?!<\/a>).)+)<\/a>|', function ($match) use($powers){
+            $ids    = explode(',', $match[1]);
+            foreach ($ids as $k => $v) {
+
+                if (!empty($powers) && !in_array($v, $powers)) {
+                    return '';
+                }
+                return $match[0];
+            }
+        }, $content);
+
+        $content = preg_replace_callback('|<th[^>]*dh-power-id="([^"]*)"[^>]*>(((?!<\/th>).)+)<\/th>|', function ($match) use($powers) {
             $ids    = explode(',', $match[1]);
             foreach ($ids as $k => $v) {
                 if (!empty($powers) && !in_array($v, $powers)) {
@@ -77,6 +89,15 @@ class Native
             }
         }, $content);
 
+        $content = preg_replace_callback('|<td[^>]*dh-power-id="([^"]*)"[^>]*>(((?!<\/td>).)+)<\/td>|', function ($match) use($powers) {
+            $ids    = explode(',', $match[1]);
+            foreach ($ids as $k => $v) {
+                if (!empty($powers) && !in_array($v, $powers)) {
+                    return '';
+                }
+                return $match[0];
+            }
+        }, $content);
         return $content;
     }
 

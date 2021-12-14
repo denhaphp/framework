@@ -7,6 +7,7 @@ use denha\Cookie;
 use denha\Db;
 use denha\HttpResource;
 use denha\Route;
+use denha\Log;
 
 if (!function_exists('abort')) {
     /**
@@ -461,7 +462,9 @@ if (!function_exists('imgUrl')) {
                     $url = $imgName;
                 }
 
-                if ($host && $imgName) {
+                if ($host == 1) {
+                    $url = Config::get('uploadfile') . $url;
+                }elseif ($host && $imgName) {
                     $url = $host . $url;
                 } else {
                     $url = HttpResource::getHost() . Config::get('uploadfile') . $url;
@@ -575,7 +578,7 @@ if (!function_exists('response')) {
         $debug   = $options['debug'] ?? false;
         $ssl     = $options['ssl'] ?? [];
         $isCode  = $options['is_code'] ?? false;
-        $outTime = $options['out_time'] ?? 10;
+        $outTime = $options['out_time'] ?? 30;
 
         $ch = curl_init(); // 初始化curl
 
@@ -678,10 +681,50 @@ if (!function_exists('response')) {
             }
             print_r('-------END-----' . \PHP_EOL);
         }
-
+        if(Config::get('curl_log')){
+            $html = [];
+            $html['输入参数Method'] = $method;
+            $html['输入参数param'] = $param;
+            $html['输入参数header'] = $headers;
+            $html['输入参数options'] = $options;
+            $html['请求Code'] = $code;
+            if (200 === $code) {
+                $html['返回结果'] = $data;
+                Log::setChannel('runcurl')->info('-------输入参数Url-----' . $url.' '.json_encode($html,JSON_UNESCAPED_UNICODE ),[],'');
+            } else {
+                $html['返回结果'] = curl_error($ch);
+                Log::setChannel('runcurl')->error('-------输入参数Url-----' . $url.' '.json_encode($html,JSON_UNESCAPED_UNICODE ),[],'');
+            }
+        }
         if (200 === $code) {
             if ($isJson) {
-                $res = json_decode($data, true);
+                // BOM头的不可见字符剔除
+                $res = json_decode(trim($data,chr(239).chr(187).chr(191)), true);
+
+                switch (json_last_error()) {
+                    case JSON_ERROR_NONE:
+                        // echo ' - No errors'.PHP_EOL;
+                    break;
+                    case JSON_ERROR_DEPTH:
+                        echo ' - Maximum stack depth exceeded'.PHP_EOL;
+                    break;
+                    case JSON_ERROR_STATE_MISMATCH:
+                        echo ' - Underflow or the modes mismatch'.PHP_EOL;
+                    break;
+                    case JSON_ERROR_CTRL_CHAR:
+                        echo ' - Unexpected control character found'.PHP_EOL;
+                    break;
+                    case JSON_ERROR_SYNTAX:
+                        echo ' - Syntax error, malformed JSON'.PHP_EOL;
+                    break;
+                    case JSON_ERROR_UTF8:
+                        echo ' - Malformed UTF-8 characters, possibly incorrectly encoded'.PHP_EOL;
+                    break;
+                    default:
+                        echo ' - Unknown error';
+                    break;
+                }
+
             } else {
                 $res = $data;
             }
@@ -743,6 +786,17 @@ if (!function_exists('session')) {
             session_start([
                 'cache_limiter' => 'nocache',
             ]);
+            $params = session_get_cookie_params();
+
+            $arr_cookie_options = array (
+                'expires' => 0,
+                'path' => $params["path"],
+                'domain' => $params["domain"], // leading dot for compatibility or use subdomain
+                'secure' => true,     // or false
+                'httponly' => true,    // or false
+                'samesite' => 'None' // None || Lax  || Strict
+                );
+            setcookie('PHPSESSID', session_id(), $arr_cookie_options);
         }
 
         //删除

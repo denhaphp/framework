@@ -30,9 +30,7 @@ class Exception extends \Exception
         self::$whoops = new ErrorRun;
 
         if ($httpResource->getMethod() == 'CLI') {
-            self::$whoops->prependHandler(function () {
-                echo 'denha have a error so kill';
-            });
+            self::$whoops->prependHandler(new PlainTextHandler);
         } elseif ($httpResource->isAjax()) {
             self::$whoops->prependHandler(function () {
 
@@ -92,8 +90,6 @@ class Exception extends \Exception
         else {
             $handler = new PrettyPageHandler;
             $handler->setPageTitle("denha have errors");
-
-         
             // $handler->setEditor(function ($file, $line) {error_log($file . $line, 3, DATA_RUN_PATH . '1.log');});
             self::$whoops->prependHandler($handler);
         }
