@@ -140,7 +140,11 @@ class App
 
         $object = new ReflectionClass(HttpResource::getClass()); // 获取类信息
 
+        self::$config['object'] = $object->__toString();
+        
         $request = HttpResource::$instance->setRequest();
+
+       
 
         // 进入post提交方法
         if (($request['method'] == 'POST') && $object->hasMethod($action . 'Post')) {
@@ -160,10 +164,14 @@ class App
         $params = [];
         foreach ($method->getParameters() as $item) {
 
+            $propClass =  $item->getType()->getName();
             if ($request['method'] == 'POST' && isset($request['params']['post'][$item->name])) {
                 $params[$item->name] = $request['params']['post'][$item->name];
             } elseif ($request['method'] == 'GET' && isset($request['params']['get'][$item->name])) {
-                $params[$item->name] = $request['params']['get'][$item->name];
+                $params[$item->name] =  $request['params']['get'][$item->name];
+            } elseif( class_exists($propClass) && in_array($request['method'],['POST','GET']) ){
+                $requestBody =  $request['method'] == 'POST' ? $request['params']['post'] : $request['params']['get'];
+                $params[$item->name] = (new $propClass())->arrayToObject($requestBody ? $requestBody : []);
             }
         }
 

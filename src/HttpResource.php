@@ -229,9 +229,12 @@ class HttpResource
      */
     public static function post($name = null, $type = '', $default = '')
     {
+        $data = json_decode(file_get_contents('php://input'),true);
+        $_POST = array_merge($_POST,$data ?: []);
+
         if ($name === null) {
             foreach ($_POST as $key => $val) {
-                if (!is_array($val)) {
+                if (is_string($val)) {
                     $val        = trim($val);
                     $data[$key] = htmlspecialchars(addslashes($val), ENT_QUOTES, 'UTF-8');
                 } else {

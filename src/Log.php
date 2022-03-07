@@ -122,9 +122,9 @@ class Log
     public function __call($name, $arguments)
     {
 
-        $message   = $arguments[0] ?: '';
-        $context   = $arguments[1] ?: [];
-        $levelName = $arguments[2] ?: '';
+        $message   = $arguments[0] ?? '';
+        $context   = $arguments[1] ?? [];
+        $levelName = $arguments[2] ?? '';
 
         if ($this->limitLevel($name)) {
             if (!self::$loggers[$this->id]->getHandlers()) {

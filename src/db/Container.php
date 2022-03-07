@@ -13,7 +13,9 @@ use \Exception;
 use \PDO;
 
 abstract class Container
-{
+{   
+
+    private $whereKey = 0;
 
     private static $do; // 数据库操作符
 
@@ -41,6 +43,7 @@ abstract class Container
         'table'    => null,
         'params'   => [],
         'tmp'      => false,
+        'join'     => '',
     ];
 
     public $transactions = 0; // 事务计数器 处理事务嵌套问题
@@ -258,7 +261,7 @@ abstract class Container
     }
 
     /** 读数据库连接 */
-    public function connectRead($configs)
+    public function connectRead($configs = null)
     {
 
         $configs = &self::$do[$this->dbFileId];
@@ -479,14 +482,15 @@ abstract class Container
         return $this;
     }
 
+     
     /**
      * 查询条件
      * @date   2019-09-29T16:49:48+0800
      * @author ChenMingjiang
-     * @param  [type]                   $where   [字段值 数组【 [field] => ['exp','value','maplink'] 】]
-     * @param  [type]                   $exp     [比较类型]
-     * @param  [type]                   $value   [值]
-     * @param  string                   $mapLink [链接符 AND OR]
+     * @param  [type]                   $where       [字段值 数组【 [field] => ['exp','value','maplink'] 】]
+     * @param  [type]                   $exp         [比较类型]
+     * @param  [type]                   $value       [值]
+     * @param  string                   $mapLink     [链接符 AND OR]
      * @return [type]                   [description]
      */
     public function where($where, $exp = null, $value = null, $mapLink = 'AND')
@@ -494,6 +498,14 @@ abstract class Container
 
         if (!$where) {
             return $this;
+        }
+        
+        // 如果where是bool 则转化一下存储值
+        if(is_bool($where) && $where === true){
+            $where = $exp;
+            $exp = $value;
+            $value = $mapLink === 'AND' ? null : $mapLink;
+            $mapLink = 'AND';
         }
 
         // 存在三个参数 $exp => 参数值
@@ -751,7 +763,9 @@ abstract class Container
     /** 处理查询条件 */
     public function parseMap($mapField, $mapExp, $mapValue, $mapLink = 'AND'): array
     {
-        $mapValueField = ':where_' . str_replace(['.', '`'], ['_', ''], $mapField); // 预加载名称
+        $this->whereKey ++ ;
+
+        $mapValueField = ':where_' . str_replace(['.', '`'], ['_', ''], $mapField).'_'.$this->whereKey; // 预加载名称
         $mapField      = $this->addFieldTag($mapField); // 格式化字段
         $bankMapExp    = ' ' . trim($mapExp) . ' '; // 格式条件
         $mapLink       = ' ' . $mapLink . ' '; // 连接符
@@ -898,6 +912,18 @@ abstract class Container
         }
 
         return $mapSql;
+    }
+
+    public function clearBuild()
+    {
+        $this->build['field'] = '*';
+        $this->build['sql']   = '';
+        $this->build['join']  = '';
+        $this->build['data']  = [];
+        $this->build['order'] = null;
+        $this->build['group'] = null;
+        $this->build['table'] = null;
+
     }
 
     /** 解析Join */
@@ -1079,9 +1105,9 @@ abstract class Container
      * @param  [type]                   $table [description]
      * @return [type]                          [description]
      */
-    public function childSqlQuery(string $table)
+    public function childSqlQuery(string $table, string $field = null)
     {
-        $this->build['table'] = '(' . $table . ') as child';
+        $this->build['table'] = '(' . $table . ') as '.($field ?: 'child');
 
         return $this;
     }
@@ -1093,6 +1119,8 @@ abstract class Container
         $this->options['type'] = $type;
 
         $this->connect(); // 链接数据库
+
+        $this->clearBuild(); // 初始化
 
         $this->parseTable(); // 解析数据表
 
@@ -1363,8 +1391,8 @@ abstract class Container
         }
 
         $result = $this->query($this->buildSql('COUNT'), $this->build['params']);
-        $data   = $result->fetchColumn();
-
+        $data   = $result === false ? 0 : $result->fetchColumn();
+        
         // 如果开启缓存则保存缓存
         return $this->setCache((int) $data);
 

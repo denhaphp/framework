@@ -606,7 +606,7 @@ if (!function_exists('response')) {
                 break;
             case 'DELETE':
                 foreach ($param as $key => $value) {
-                    if (fasle !== stripos($url, '?')) {
+                    if (false !== stripos($url, '?')) {
                         $url .= '?' . $key . '=' . $value;
                     } else {
                         $url .= '&' . $key . '=' . $value;
@@ -644,6 +644,8 @@ if (!function_exists('response')) {
         curl_setopt($ch, \CURLOPT_RETURNTRANSFER, 1); // 获取的信息以文件流的形式返回
         curl_setopt($ch, \CURLOPT_SSL_VERIFYHOST, 0); // 从证书中检查SSL加密算法是否存在
         curl_setopt($ch, \CURLOPT_SSL_VERIFYPEER, 0); // 对认证证书来源的检查
+        curl_setopt($ch, \CURLINFO_HEADER_OUT, 1); //启用时追踪句柄的请求字符串
+        curl_setopt($ch, \CURLOPT_FOLLOWLOCATION, 1); //启用时会将服务器返回的"Location: "放在header中递归的返回给服务器使用
         curl_setopt($ch, \CURLOPT_TIMEOUT, $outTime); // 请求超时时间
         curl_setopt($ch, \CURLOPT_URL, trim($url)); // 要访问的地址
 
@@ -827,8 +829,6 @@ if (!function_exists('session')) {
         }
 
         return true;
-
-        return false;
     }
 }
 if (!function_exists('table')) {
@@ -999,9 +999,7 @@ if (!function_exists('parseName')) {
     {
         //下划线转大写
         if ($type) {
-            return ucfirst(preg_replace_callback('/_([a-zA-Z])/', function ($match) {
-                return strtoupper($match[1]);
-            }, $name));
+            return ucfirst(preg_replace_callback('/_([a-zA-Z])/', function ($match) { return strtoupper($match[1]);}, $name));
         }
         //大写转下划线小写
         else {
