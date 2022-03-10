@@ -15,13 +15,16 @@
         }
     ],
     "require": {
-        "php": "^7.1.0",
+        "php": "^7.1.0|^8.0",
         "denha/cache":"^1.0",
         "denha/captcha":"^1.0",
         "filp/whoops": "^2.0",
         "monolog/monolog": "^2.0"
     },
     "require-dev": {
+        "phpunit/phpunit":"^9",
+        "mockery/mockery": "^1.5",
+        "fakerphp/faker": "^1.19"
     },
     "autoload": {
         "files": [],
