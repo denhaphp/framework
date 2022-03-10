@@ -118,6 +118,8 @@ class Exception extends \Exception
 
         self::$whoops->register();
 
+        return $this;
+
     }
 
 }

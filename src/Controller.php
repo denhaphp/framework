@@ -104,8 +104,11 @@ class Controller
      * @return [type]                           [description]
      */
     protected function ajaxReturn($status, $msg = null, $data = null): string
-    {
-        header("Content-Type:application/json; charset=utf-8");
+    {   
+
+        if(HttpResource::getMethod() != 'CLI'){
+            header("Content-Type:application/json; charset=utf-8");
+        }
 
         // 处理参数信息
         if (is_array($status)) {
@@ -138,7 +141,7 @@ class Controller
                         'get'   => (array) HttpResource::$request['params']['get'],
                         'files' => $_FILES,
                     ],
-                    'docComment' => !App::$methodDocComment ?: explode(PHP_EOL, App::$methodDocComment),
+                    'docComment' => App::$methodDocComment ? explode(PHP_EOL, App::$methodDocComment) : '',
                     'ip'         => HttpResource::ip(),
                     'sql'        => Trace::$sqlInfo,
                 ],
@@ -149,12 +152,12 @@ class Controller
         $value = array_merge($array, $value);
 
         // jsonpReturn返回
-        $callback = get('callback', 'text', '');
+        $callback =  HttpResource::$request['params']['get']['callback'] ?? null;
         if ($callback && HttpResource::getMethod() === 'GET') {
             return $callback . '(' . json_encode($value) . ')';
         }
 
         // 正常ajax返回
-        return json_encode($value);
+        return json_encode($value,JSON_UNESCAPED_UNICODE);
     }
 }
